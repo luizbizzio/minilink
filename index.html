@@ -5,10 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Cloudflare URL Shortener</title>
 
-  <!-- Google Font -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-
-  <!-- Simple Icons CDN (feather) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/feather-icons@4.29.1/dist/feather.min.css">
 
   <style>
@@ -97,14 +94,12 @@
 </head>
 <body>
 
-  <!-- botão de atalho para admin -->
   <div class="topbar">
     <a class="icon-btn" href="admin" title="Admin panel">
       <i data-feather="lock"></i>
     </a>
   </div>
 
-  <!-- cartão principal -->
   <div class="card">
     <h1>URL Shortener</h1>
 
@@ -123,12 +118,11 @@
     <div id="result"></div>
   </div>
 
-  <!-- Feather icons init -->
   <script src="https://cdn.jsdelivr.net/npm/feather-icons@4.29.1/dist/feather.min.js"></script>
   <script>feather.replace();</script>
 
   <script>
-    const API = 'https://url-shortener.luizbizzio.workers.dev/'; // seu Worker
+    const API = 'https://url-shortener.luizbizzio.workers.dev/';
 
     async function sha256(str){
       const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
