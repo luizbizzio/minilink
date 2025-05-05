@@ -1,62 +1,165 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Shortener Admin</title>
-<style>
- body{font-family:system-ui;background:#fafafa;padding:40px}
- table{border-collapse:collapse;width:100%;margin-top:20px}
- th,td{padding:8px;border:1px solid #ddd;font-size:14px}
- button{padding:4px 10px;background:#e00;color:#fff;border:none;border-radius:4px;cursor:pointer}
- #login{display:flex;flex-direction:column;gap:8px;max-width:300px;margin:auto}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cloudflare URL Shortener</title>
+
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- Simple Icons CDN (feather) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/feather-icons@4.29.1/dist/feather.min.css">
+
+  <style>
+    :root {
+      --primary:#0066ff;
+      --bg:#f2f5fa;
+      --card:#ffffff;
+      --text:#222;
+      --radius:14px;
+    }
+    *{box-sizing:border-box;}
+    body{
+      margin:0;
+      font-family:Inter,system-ui,sans-serif;
+      background:var(--bg);
+      display:flex;
+      min-height:100vh;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+    }
+    .card{
+      width:100%;
+      max-width:420px;
+      background:var(--card);
+      border-radius:var(--radius);
+      box-shadow:0 8px 24px rgba(0,0,0,.08);
+      padding:32px 28px 40px;
+      text-align:center;
+    }
+    h1{
+      margin:0 0 24px;
+      font-weight:600;
+      color:var(--text);
+      font-size:1.6rem;
+    }
+    input,select,button{
+      width:100%;
+      padding:12px 14px;
+      font-size:15px;
+      border-radius:8px;
+      border:1px solid #ccd4e0;
+      margin-top:12px;
+      font-family:inherit;
+    }
+    button{
+      background:var(--primary);
+      color:#fff;
+      border:none;
+      cursor:pointer;
+      transition:background .2s;
+    }
+    button:hover{background:#0056da;}
+    #result{
+      margin-top:28px;
+      word-break:break-all;
+      line-height:1.4;
+    }
+    #result a{
+      color:var(--primary);
+      text-decoration:none;
+      word-break:break-all;
+    }
+    .topbar{
+      position:fixed;
+      top:18px;right:18px;
+    }
+    .icon-btn{
+      width:44px;height:44px;
+      border-radius:50%;
+      background:var(--card);
+      box-shadow:0 4px 12px rgba(0,0,0,.08);
+      border:none;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      transition:background .2s;
+    }
+    .icon-btn:hover{background:#e8eef8;}
+    .icon-btn i{width:20px;height:20px;color:var(--text);}
+    @media(max-width:480px){
+      .card{padding:24px 20px 32px;}
+    }
+  </style>
 </head>
 <body>
-<div id="app"></div>
 
-<script>
-const ENDPOINT='https://url-shortener.luizbizzio.workers.dev';
-let TOKEN='';
+  <!-- botão de atalho para admin -->
+  <div class="topbar">
+    <a class="icon-btn" href="admin.html" title="Admin panel">
+      <i data-feather="lock"></i>
+    </a>
+  </div>
 
-function uiLogin(){
- app.innerHTML=`<div id="login">
-   <h2>Admin Login</h2>
-   <input id="tok" type="password" placeholder="Admin token">
-   <button onclick="login()">Enter</button>
- </div>`;
-}
-async function login(){
- TOKEN=document.getElementById('tok').value.trim();
- loadLinks();
-}
-async function loadLinks(){
- const res=await fetch(ENDPOINT+'/api/list',{headers:{'X-Admin-Token':TOKEN}});
- if(!res.ok){alert('Invalid token');uiLogin();return;}
- const data=await res.json();
- renderTable(data);
-}
-function renderTable(arr){
- app.innerHTML=`<h2>All Links</h2>
- <table><tr><th>Code</th><th>URL</th><th>Expires in</th><th></th></tr>
- ${arr.map(o=>`<tr>
-   <td><a href="${ENDPOINT}/${o.code}" target="_blank">${o.code}</a></td>
-   <td>${o.url}</td>
-   <td>${o.expiresIn?format(o.expiresIn):'∞'}</td>
-   <td><button onclick="del('${o.code}')">Delete</button></td></tr>`).join('')}
- </table>`;
-}
-function format(s){
- if(s<=0)return 'expired';
- const d=Math.floor(s/86400); const h=Math.floor(s%86400/3600);
- const m=Math.floor(s%3600/60);
- return `${d?d+'d ':''}${h?h+'h ':''}${m?m+'m':''}`;
-}
-async function del(code){
- if(!confirm('Delete '+code+' ?'))return;
- await fetch(ENDPOINT+'/api/delete/'+code,{method:'DELETE',headers:{'X-Admin-Token':TOKEN}});
- loadLinks();
-}
-uiLogin();
-</script>
+  <!-- cartão principal -->
+  <div class="card">
+    <h1>URL Shortener</h1>
+
+    <input id="long" placeholder="https://example.com/very/long/link" />
+
+    <select id="ttl">
+      <option value="900">15 minutes</option>
+      <option value="3600">1 hour</option>
+      <option value="86400">1 day</option>
+      <option value="604800">1 week</option>
+      <option value="2592000">1 month</option>
+    </select>
+
+    <button id="go">Shorten Link</button>
+
+    <div id="result"></div>
+  </div>
+
+  <!-- Feather icons init -->
+  <script src="https://cdn.jsdelivr.net/npm/feather-icons@4.29.1/dist/feather.min.js"></script>
+  <script>feather.replace();</script>
+
+  <script>
+    const API = 'https://url-shortener.luizbizzio.workers.dev/'; // seu Worker
+
+    async function sha256(str){
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+      return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,6);
+    }
+
+    async function shorten(){
+      const longUrl = document.getElementById('long').value.trim();
+      if(!/^https?:\/\//i.test(longUrl)){
+        alert('Enter a valid URL (http/https).'); return;
+      }
+      const ttl = parseInt(document.getElementById('ttl').value, 10);
+      const code = await sha256(longUrl);
+
+      const res = await fetch(API, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({code, url:longUrl, ttl})
+      });
+
+      if(res.ok){
+        const short = `${API}${code}`;
+        document.getElementById('result').innerHTML =
+          `<strong>Short URL:</strong><br><a href="${short}" target="_blank">${short}</a>`;
+      }else{
+        const msg = await res.text();
+        alert('Error: '+msg);
+      }
+    }
+
+    document.getElementById('go').addEventListener('click', shorten);
+  </script>
 </body>
 </html>
