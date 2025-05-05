@@ -72,18 +72,27 @@
       document.getElementById('result').innerHTML =
         `<p>Shortened URL:</p><a href="${short}" target="_blank">${short}</a>`;
     };
-    
+
     (async () => {
       const slug = location.pathname.replace(/^\//, '');
       if (!slug || slug === '' || slug === 'index.html') return;
-
-      const map = await fetch('links.json', { cache: 'no-store' }).then(r => r.json());
-      if (map[slug]) {
-        location.replace(map[slug]);
-      } else {
-        document.body.textContent = 'Link not found';
+    
+      try {
+        const res = await fetch('links.json', { cache: 'no-store' });
+        if (!res.ok) throw new Error('links.json not found');
+    
+        const map = await res.json();
+        if (map[slug]) {
+          location.replace(map[slug]);
+        } else {
+          document.body.textContent = 'Short link not found.';
+        }
+      } catch (err) {
+        console.error('Error loading links.json:', err);
+        document.body.textContent = 'Link data not available.';
       }
     })();
+    
   </script>
 </body>
 </html>
