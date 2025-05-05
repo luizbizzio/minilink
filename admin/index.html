@@ -5,7 +5,6 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/feather-icons@4.29.1/dist/feather.min.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-/* -- (estilos iguais aos anteriores) -- */
 :root{--primary:#0066ff;--bg:#f2f5fa;--card:#fff;--text:#222;--radius:14px}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Inter,sans-serif;background:var(--bg);min-height:100vh;display:flex;justify-content:center;align-items:flex-start;padding:40px 12px}
@@ -59,16 +58,14 @@ const ENDPOINT='https://url-shortener.luizbizzio.workers.dev';
 let TOKEN=localStorage.getItem('admin_token')||'';
 if(TOKEN) loadList();
 
-/* ---------- LOGIN ---------- */
 function login(ev){
-  ev.preventDefault();                        // evita refresh
+  ev.preventDefault();
   TOKEN=document.getElementById('tok').value.trim();
   if(!TOKEN) return;
   if(document.getElementById('remember').checked) localStorage.setItem('admin_token',TOKEN);
   loadList();
 }
 
-/* ---------- UTIL HTML ---------- */
 const flag = cc => cc&&cc.length===2 ? `<img src="https://flagcdn.com/24x18/${cc.toLowerCase()}.png" width="16" height="12" style="vertical-align:-3px">` : '';
 const badge = s => {
   if(s<=0) return'<span class="badge red">expired</span>';
@@ -78,7 +75,6 @@ const badge = s => {
 const logsHtml = a => !a||!a.length ? '<small>—</small>' :
   a.slice(0,3).map(l=>`<div class="logs">${flag(l.loc)} ${l.loc} ${l.ip}<br>${new Date(l.t).toLocaleString()}</div>`).join('');
 
-/* ---------- LISTA PRINCIPAL ---------- */
 async function loadList(){
   app.innerHTML='<h1 style="margin-bottom:0">Loading…</h1>';
   const res = await fetch(`${ENDPOINT}/api/list`,{headers:{'X-Admin-Token':TOKEN}});
@@ -108,12 +104,10 @@ async function renderTable(list){
   feather.replace();
 }
 
-/* ---------- POPUP DETAIL ---------- */
 async function openDetail(slug){
   overlay.style.display='flex'; mTitle.textContent='Stats – '+slug;
   const data=await fetch(`${ENDPOINT}/api/detail/${slug}`,{headers:{'X-Admin-Token':TOKEN}}).then(r=>r.json());
 
-  /* gráfico */
   chart.replaceWith(chart.cloneNode(true)); const ctx=document.getElementById('chart');
   const useHour=Object.keys(data.byHour||{}).length;
   const labels=(useHour?Object.keys(data.byHour):Object.keys(data.byDay)).sort();
@@ -135,7 +129,6 @@ async function openDetail(slug){
         }}}}}
   });
 
-  /* mapa */
   map.replaceWith(map.cloneNode(true)); const m=L.map('map',{worldCopyJump:true}).setView([20,0],2);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(m);
   if(data.points.length){
