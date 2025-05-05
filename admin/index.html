@@ -85,7 +85,7 @@ async function renderTable(arr){
     rows+=`
       <tr>
         <td><a href="detail.html?slug=${o.code}">${o.code}</a></td>
-        <td>${dest}</td>
+        <a href="detail.html?dest=${o.code}">${o.code}</a></td>
         <td>${clicks}</td>
         <td>${left}</td>
         <td>${created}</td>
