@@ -1,5 +1,4 @@
 name = "url-shortener"
-main = "src/_worker.js"
 compatibility_date = "2025-05-05"
 
 kv_namespaces = [
