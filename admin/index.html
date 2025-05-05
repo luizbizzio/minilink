@@ -123,7 +123,7 @@ async function renderTable(arr){
     rows+=`
       <tr>
         <td><a onclick="openDetail('${o.code}')" >${o.code}</a></td>
-        <td>${o.url||'-'}</td>
+        <td><a href="${o.url}">${o.url||'-'}</a></td>
         <td>${stats.clicks||0}</td>
         <td>${o.expiresIn!=null?badge(o.expiresIn):'∞'}</td>
         <td>${o.created?new Date(o.created).toLocaleString():'-'}</td>
