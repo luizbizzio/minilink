@@ -1,6 +1,5 @@
 name = "url-shortener"
-type = "javascript"
-compatibility_date = "2025-05-06"
+main = "_worker.js"
 
 kv_namespaces = [
   { binding = "LINKS",     id = "a2774cd1a1374de49b12c0d62e255fcd" },
@@ -10,6 +9,5 @@ kv_namespaces = [
   { binding = "GEO",       id = "2a629d3120dc498fae067825c640343f" }
 ]
 
-[site]
-bucket = "./"
-entry-point = "."
+[assets]
+directory = "./"
