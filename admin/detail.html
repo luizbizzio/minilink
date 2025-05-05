@@ -1,0 +1,48 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Slug detail</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+ body{font-family:Inter,sans-serif;background:#f2f5fa;margin:0;padding:24px}
+ h1{margin:0 0 20px}
+ #chart{max-width:900px;height:260px;margin-bottom:24px}
+ #map{width:100%;max-width:900px;height:400px;border-radius:14px;box-shadow:0 4px 18px rgba(0,0,0,.1)}
+</style>
+</head><body>
+<h1 id="title">Loading…</h1>
+<canvas id="chart"></canvas>
+<div id="map"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet.heat/dist/leaflet-heat.js"></script>
+<script>
+const API='https://url-shortener.luizbizzio.workers.dev';
+const slug=new URLSearchParams(location.search).get('slug');
+
+(async()=>{
+  if(!slug){document.body.textContent='No slug';return;}
+  const data=await fetch(`${API}/api/detail/${slug}`).then(r=>r.json());
+  document.getElementById('title').textContent=`Stats – ${slug}`;
+
+  /* grafico */
+  const labels=Object.keys(data.byDay).sort();
+  const values=labels.map(d=>data.byDay[d]);
+  new Chart(document.getElementById('chart'),{
+    type:'line',
+    data:{labels:labels.map(d=>`${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6)}`),
+          datasets:[{data:values,fill:false}]},
+    options:{plugins:{legend:{display:false}},responsive:true}
+  });
+
+  /* mapa heat */
+  const map=L.map('map',{worldCopyJump:true}).setView([20,0],2);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {attribution:'© OSM'}).addTo(map);
+  if(data.points.length){
+    const heat=data.points.map(([lat,lon])=>[lat,lon,0.6]);
+    L.heatLayer(heat,{radius:25}).addTo(map);
+  }
+})();
+</script></body></html>
