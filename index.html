@@ -43,11 +43,52 @@
   <div id="app"></div>
 
   <script>
+    // Base62 encoding characters
+    const BASE62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    function toBase62(uint8Array) {
+      let bigint = BigInt(0);
+      for (let i = 0; i < uint8Array.length; i++) {
+        bigint = (bigint << BigInt(8)) + BigInt(uint8Array[i]);
+      }
+      let output = "";
+      while (bigint > 0) {
+        output = BASE62[bigint % BigInt(62)] + output;
+        bigint = bigint / BigInt(62);
+      }
+      return output;
+    }
+
+    function fromBase62(str) {
+      let bigint = BigInt(0);
+      for (let char of str) {
+        bigint = bigint * BigInt(62) + BigInt(BASE62.indexOf(char));
+      }
+      const bytes = [];
+      while (bigint > 0) {
+        bytes.unshift(Number(bigint % BigInt(256)));
+        bigint = bigint / BigInt(256);
+      }
+      return new Uint8Array(bytes);
+    }
+
+    function encodeUrl(url) {
+      const encoder = new TextEncoder();
+      const bytes = encoder.encode(url);
+      return toBase62(bytes);
+    }
+
+    function decodeUrl(base62) {
+      const bytes = fromBase62(base62);
+      const decoder = new TextDecoder();
+      return decoder.decode(bytes);
+    }
+
     function decodeAndRedirect() {
       const hash = window.location.hash.substring(1);
       if (hash) {
         try {
-          const url = atob(decodeURIComponent(hash));
+          const url = decodeUrl(hash);
           if (url.startsWith("http")) {
             window.location.href = url;
           } else {
@@ -76,7 +117,7 @@
         alert("Please enter a valid URL starting with http or https.");
         return;
       }
-      const encoded = encodeURIComponent(btoa(input));
+      const encoded = encodeUrl(input);
       const shortUrl = `${window.location.origin}${window.location.pathname}#${encoded}`;
       document.getElementById("result").innerHTML = `
         <p>Shortened URL:</p>
