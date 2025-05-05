@@ -1,5 +1,4 @@
 name = "url-shortener-pages"
-compatibility_date = "2025-05-07"
 pages_build_output_dir = "."
 
 kv_namespaces = [
