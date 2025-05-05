@@ -103,12 +103,12 @@ function badge(sec){
   return `<span class="badge green">${d?d+'d ':''}${h?h+'h ':''}${m?m+'m':''}</span>`;
 }
 
-function flag(cc){
-  if(!cc||cc.length!==2) return '🏳️';
-  const cp1=cc.toUpperCase().codePointAt(0)-65+0x1F1E6;
-  const cp2=cc.toUpperCase().codePointAt(1).codePointAt(0)-65+0x1F1E6;
-  return String.fromCodePoint(cp1,cp2);
-}
+ function flag(cc){
+   if(!cc||cc.length!==2) return '🏳️';
+   const cp1=cc.toUpperCase().codePointAt(0)-65+0x1F1E6;
+   const cp2=cc.toUpperCase().codePointAt(1).codePointAt(0)-65+0x1F1E6;
+   return String.fromCodePoint(cp1,cp2);
+ }
 
 function logsHtml(arr){
   if(!arr||!arr.length) return '<small>—</small>';
