@@ -2,8 +2,10 @@ name = "url-shortener-pages"
 compatibility_date = "2025-05-07"
 
 kv_namespaces = [
-  { binding = "LINKS",      id = "xxxxxxxxxxxxxxxx" },
-  { binding = "STATS",      id = "xxxxxxxxxxxxxxxx" },
-  { binding = "STATS_DAY",  id = "xxxxxxxxxxxxxxxx" },
-  { binding = "LOGS",       id = "xxxxxxxxxxxxxxxx" }
+  { binding = "LINKS",     id = "xxxxxxxxxxxxxxxx" },
+  { binding = "STATS",     id = "xxxxxxxxxxxxxxxx" },
+  { binding = "STATS_DAY", id = "xxxxxxxxxxxxxxxx" },
+  { binding = "LOGS",      id = "xxxxxxxxxxxxxxxx" }
 ]
+
+pages_build_output_dir = "."
