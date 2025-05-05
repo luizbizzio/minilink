@@ -15,9 +15,7 @@
       margin: 0;
       background-color: #f4f4f4;
     }
-    h1 {
-      margin-bottom: 10px;
-    }
+    h1 { margin-bottom: 10px; }
     input {
       padding: 10px;
       width: 300px;
@@ -33,115 +31,59 @@
       border-radius: 5px;
       cursor: pointer;
     }
-    #result {
-      margin-top: 20px;
-      word-break: break-all;
-    }
+    #result { margin-top: 20px; word-break: break-all; }
   </style>
 </head>
 <body>
-  <div id="app"></div>
+  <div id="app">
+    <h1>URL Shortener</h1>
+    <input type="text" id="input" placeholder="Paste a URL here..." />
+    <button id="shortenBtn">Shorten</button>
+    <div id="result"></div>
+  </div>
 
   <script>
-    // LZ-based compression using lz-string (standalone minimal implementation)
-    const LZString = {
-      compressToUint8Array: function(input) {
-        const keyStr = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
-        let output = "";
-        let chr1, chr2, chr3;
-        let enc1, enc2, enc3, enc4;
-        let i = 0;
-
-        const bytes = new TextEncoder().encode(input);
-        const len = bytes.length;
-        const base64 = [];
-
-        while (i < len) {
-          chr1 = bytes[i++];
-          chr2 = i < len ? bytes[i++] : Number.NaN;
-          chr3 = i < len ? bytes[i++] : Number.NaN;
-
-          enc1 = chr1 >> 2;
-          enc2 = ((chr1 & 3) << 4) | (chr2 >> 4);
-          enc3 = ((chr2 & 15) << 2) | (chr3 >> 6);
-          enc4 = chr3 & 63;
-
-          if (isNaN(chr2)) enc3 = enc4 = 64;
-          else if (isNaN(chr3)) enc4 = 64;
-
-          base64.push(
-            keyStr.charAt(enc1) +
-            keyStr.charAt(enc2) +
-            keyStr.charAt(enc3) +
-            keyStr.charAt(enc4)
-          );
-        }
-
-        return base64.join("");
-      },
-
-      decompressFromUint8Array: function(input) {
-        const keyStr = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
-        let str = atob(input);
-        const bytes = new Uint8Array(str.length);
-        for (let i = 0; i < str.length; i++) {
-          bytes[i] = str.charCodeAt(i);
-        }
-        return new TextDecoder().decode(bytes);
-      }
-    };
-
-    function encodeUrl(url) {
-      const compressed = LZString.compressToUint8Array(url);
-      return btoa(compressed).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+    async function makeCode(url) {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(url));
+      return [...new Uint8Array(buf)]
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('').slice(0, 6);
     }
 
-    function decodeUrl(base64url) {
-      const padded = base64url.replace(/-/g, "+").replace(/_/g, "/");
-      const decompressed = atob(padded);
-      return new TextDecoder().decode(Uint8Array.from(decompressed, c => c.charCodeAt(0)));
+    async function send(code, longUrl) {
+      await fetch('https://url-shortener.luizbizzio.workers.dev', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, url: longUrl })
+      });
     }
 
-    function decodeAndRedirect() {
-      const hash = window.location.hash.substring(1);
-      if (hash) {
-        try {
-          const url = decodeUrl(hash);
-          if (url.startsWith("http")) {
-            window.location.href = url;
-          } else {
-            document.body.innerText = "Invalid URL.";
-          }
-        } catch {
-          document.body.innerText = "Failed to decode the URL.";
-        }
-        return true;
-      }
-      return false;
-    }
-
-    if (!decodeAndRedirect()) {
-      document.getElementById("app").innerHTML = `
-        <h1>URL Shortener</h1>
-        <input type="text" id="input" placeholder="Paste a URL here..." />
-        <button onclick="generate()">Shorten</button>
-        <div id="result"></div>
-      `;
-    }
-
-    function generate() {
-      const input = document.getElementById("input").value.trim();
-      if (!input.startsWith("http")) {
-        alert("Please enter a valid URL starting with http or https.");
+    document.getElementById('shortenBtn').onclick = async () => {
+      const input = document.getElementById('input').value.trim();
+      if (!/^https?:\/\//i.test(input)) {
+        alert('Enter a valid URL starting with http or https');
         return;
       }
-      const encoded = encodeUrl(input);
-      const shortUrl = `${window.location.origin}${window.location.pathname}#${encoded}`;
-      document.getElementById("result").innerHTML = `
-        <p>Shortened URL:</p>
-        <a href="${shortUrl}" target="_blank">${shortUrl}</a>
-      `;
-    }
+
+      const code = await makeCode(input);
+      await send(code, input);
+
+      const short = `${location.origin}${location.pathname}${code}`;
+      document.getElementById('result').innerHTML =
+        `<p>Shortened URL:</p><a href="${short}" target="_blank">${short}</a>`;
+    };
+    
+    (async () => {
+      const slug = location.pathname.replace(/^\//, '');
+      if (!slug || slug === '' || slug === 'index.html') return;
+
+      const map = await fetch('links.json', { cache: 'no-store' }).then(r => r.json());
+      if (map[slug]) {
+        location.replace(map[slug]);
+      } else {
+        document.body.textContent = 'Link not found';
+      }
+    })();
   </script>
 </body>
 </html>
