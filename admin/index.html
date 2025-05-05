@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Shortener Admin</title>
+<meta name="robots" content="noindex" />
 
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/feather-icons@4.29.1/dist/feather.min.css" />
@@ -12,7 +13,7 @@
 :root{
   --primary:#0066ff;
   --bg:#f2f5fa;
-  --card:#fff;
+  --card:#ffffff;
   --text:#222;
   --radius:14px;
 }
@@ -21,33 +22,44 @@ body{
   font-family:Inter,system-ui,sans-serif;
   background:var(--bg);
   min-height:100vh;
-  display:flex;justify-content:center;align-items:flex-start;
+  display:flex;
+  justify-content:center;
+  align-items:flex-start;
   padding:40px 12px;
 }
 .card{
-  width:100%;max-width:960px;
+  width:100%;max-width:1000px;
   background:var(--card);
   border-radius:var(--radius);
   padding:32px 28px 40px;
   box-shadow:0 8px 24px rgba(0,0,0,.08);
 }
 h1{font-size:1.6rem;margin-bottom:24px;color:var(--text)}
-input,button{
-  padding:10px 14px;font-size:15px;border-radius:8px;border:1px solid #ccd4e0;
-}
-button{
-  background:var(--primary);color:#fff;border:none;cursor:pointer;transition:.2s;
-}
-button:hover{background:#0056da}
-table{width:100%;border-collapse:collapse;margin-top:24px;font-size:14px}
-th,td{padding:10px;border-bottom:1px solid #e5e9f0;text-align:left}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:10px 8px;border-bottom:1px solid #e5e9f0;text-align:left;vertical-align:top}
 th{background:#f0f4ff;font-weight:600}
+td a{color:var(--primary);text-decoration:none}
 .badge{padding:2px 6px;border-radius:4px;font-size:12px}
 .badge.red{background:#ffe5e5;color:#d40000}
 .badge.green{background:#e2fde2;color:#006b00}
 small{font-size:12px;color:#666}
-.logs{font-size:13px;margin-top:6px;color:#444;line-height:1.35}
-.logs span{display:inline-block;margin-right:4px}
+.logs{font-size:12.5px;color:#444;line-height:1.35}
+.icon-del{
+  background:#ff5757;border:none;border-radius:6px;
+  width:34px;height:34px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:.2s;
+}
+.icon-del:hover{background:#e14a4a}
+.icon-del i{color:#fff;width:16px;height:16px}
+td:last-child{width:60px;text-align:center}
+@media(max-width:680px){
+  table,thead,tbody,tr,th,td{display:block}
+  tr{margin-bottom:18px}
+  th{display:none}
+  td{border:none;padding:6px 4px}
+  td:last-child{width:auto;text-align:right}
+}
 </style>
 </head>
 <body>
@@ -55,7 +67,7 @@ small{font-size:12px;color:#666}
 <div class="card" id="app">
   <h1>Admin Login</h1>
   <input id="tok" type="password" placeholder="Admin token" style="width:260px" />
-  <button onclick="login()" style="margin-left:8px">Enter</button>
+  <button onclick="login()" style="margin-left:8px;margin-top:12px">Enter</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/feather-icons@4.29.1/dist/feather.min.js"></script>
@@ -65,11 +77,12 @@ let TOKEN = '';
 
 function login(){
   TOKEN = document.getElementById('tok').value.trim();
+  if(!TOKEN) return;
   loadList();
 }
 
 async function loadList(){
-  app.innerHTML = '<h1>Loading…</h1>';
+  app.innerHTML = '<h1 style="margin-bottom:0">Loading…</h1>';
   const res = await fetch(ENDPOINT+'/api/list',{headers:{'X-Admin-Token':TOKEN}});
   if(!res.ok){app.innerHTML='<h1>Invalid token</h1>';return;}
   const list = await res.json();
@@ -79,41 +92,45 @@ async function loadList(){
 async function renderTable(arr){
   let rows='';
   for(const o of arr){
-    const stats = await fetch(`${ENDPOINT}/api/stats/${o.code}`,{
-      headers:{'X-Admin-Token':TOKEN}}).then(r=>r.json());
-    const left = o.expiresIn!=null ? format(o.expiresIn) : '∞';
+    const stats = await fetch(`${ENDPOINT}/api/stats/${o.code}`,
+      {headers:{'X-Admin-Token':TOKEN}}).then(r=>r.json());
+
+    const clicks = stats.clicks || 0;
+    const dest   = o.url || '-';
+    const left   = o.expiresIn!=null ? format(o.expiresIn) : '∞';
     rows += `
       <tr>
         <td><a href="${ENDPOINT}/${o.code}" target="_blank">${o.code}</a></td>
-        <td>${o.url}</td>
-        <td>${stats.clicks}</td>
+        <td>${dest}</td>
+        <td>${clicks}</td>
         <td>${left}</td>
         <td>${logsHtml(stats.logs)}</td>
-        <td><button onclick="del('${o.code}')"><i data-feather="trash-2" size="14"></i></button></td>
+        <td><button class="icon-del" onclick="del('${o.code}')"><i data-feather="trash-2"></i></button></td>
       </tr>`;
   }
 
   app.innerHTML = `
     <h1>All Links</h1>
     <table>
-      <tr><th>Slug</th><th>Destination</th><th>Clicks</th><th>Expires in</th><th>Last hits</th><th></th></tr>
-      ${rows}
+      <thead><tr>
+        <th>Slug</th><th>Destination</th><th>Clicks</th><th>Expires&nbsp;in</th><th>Last hits</th><th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
     </table>`;
   feather.replace();
 }
 
 function format(sec){
   if(sec<=0) return '<span class="badge red">expired</span>';
-  const d=Math.floor(sec/86400);const h=Math.floor(sec%86400/3600);
-  const m=Math.floor(sec%3600/60);
+  const d=Math.floor(sec/86400), h=Math.floor(sec%86400/3600), m=Math.floor(sec%3600/60);
   return `<span class="badge green">${d?d+'d ':''}${h?h+'h ':''}${m?m+'m':''}</span>`;
 }
 
 function logsHtml(arr){
-  if(!arr.length) return '<small>—</small>';
+  if(!arr || !arr.length) return '<small>—</small>';
   return arr.slice(0,3).map(l=>{
-    const d=new Date(l.t).toLocaleString().replace(',','');
-    return `<div class="logs"><span>📍 ${l.loc}</span><span>${l.ip}</span><span>${d}</span></div>`;
+    const d = new Date(l.t).toLocaleString().replace(',', '');
+    return `<div class="logs">📍 ${l.loc}&nbsp; ${l.ip}<br>${d}</div>`;
   }).join('');
 }
 
