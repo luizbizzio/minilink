@@ -1,11 +1,11 @@
 name = "url-shortener-pages"
 compatibility_date = "2025-05-07"
+pages_build_output_dir = "."
 
 kv_namespaces = [
-  { binding = "LINKS",     id = "xxxxxxxxxxxxxxxx" },
-  { binding = "STATS",     id = "xxxxxxxxxxxxxxxx" },
-  { binding = "STATS_DAY", id = "xxxxxxxxxxxxxxxx" },
-  { binding = "LOGS",      id = "xxxxxxxxxxxxxxxx" }
+  { binding = "LINKS",     id = "a2774cd1a1374de49b12c0d62e255fcd" },
+  { binding = "STATS",     id = "bed69b5520cc4c4294d128840a097974" },
+  { binding = "STATS_DAY", id = "3bf49d57aa3b4f9fba680056a26bd6f5" },
+  { binding = "LOGS",      id = "de01551a3b504205b5712da796f010fd" },
+  { binding = "GEO",       id = "2a629d3120dc498fae067825c640343f" }
 ]
-
-pages_build_output_dir = "."
