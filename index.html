@@ -74,8 +74,8 @@
     };
 
     (async () => {
-      const slug = location.pathname.replace(/^\//, '');
-      if (!slug || slug === '' || slug === 'index.html') return;
+    const slug = location.pathname.replace(/^\/+/, '');
+    if (!slug || slug === '' || slug.includes('.')) return;
     
       try {
         const res = await fetch('links.json', { cache: 'no-store' });
