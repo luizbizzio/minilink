@@ -1,80 +1,50 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>URL Shortener</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      background: #f2f2f2;
-    }
-    h1 { margin-bottom: 20px; }
-    input, button {
-      padding: 10px;
-      font-size: 16px;
-      margin: 5px;
-      width: 300px;
-    }
-    button {
-      background-color: #007BFF;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    #result {
-      margin-top: 20px;
-      word-break: break-word;
-      text-align: center;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cloudflare URL Shortener</title>
+<style>
+ body{font-family:system-ui;background:#f4f4f4;display:flex;flex-direction:column;align-items:center;padding-top:60px}
+ input,select,button{padding:10px;font-size:16px;border-radius:6px;border:1px solid #ccc;margin:6px;width:320px}
+ button{background:#0066ff;color:#fff;cursor:pointer;border:none}
+ #result{margin-top:20px;word-break:break-all;text-align:center}
+</style>
 </head>
 <body>
-  <h1>Cloudflare URL Shortener</h1>
-  <input type="text" id="input" placeholder="Enter a long URL..." />
-  <button onclick="shorten()">Shorten</button>
-  <div id="result"></div>
+<h1>Cloudflare URL Shortener</h1>
+<input id="long" placeholder="https://example.com/very/long/url">
+<select id="ttl">
+  <option value="900">15 minutes</option>
+  <option value="3600">1 hour</option>
+  <option value="86400">1 day</option>
+  <option value="604800">1 week</option>
+  <option value="2592000">1 month</option>
+</select>
+<button onclick="shorten()">Shorten</button>
+<div id="result"></div>
 
-  <script>
-    async function generateCode(url) {
-      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(url));
-      return [...new Uint8Array(buf)]
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('')
-        .slice(0, 6);
-    }
+<script>
+const API = 'https://url-shortener.luizbizzio.workers.dev/';   // seu worker
 
-    async function shorten() {
-      const input = document.getElementById('input').value.trim();
-      if (!/^https?:\/\//i.test(input)) {
-        alert('Please enter a valid URL starting with http:// or https://');
-        return;
-      }
+async function hash(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,6);
+}
 
-      const code = await generateCode(input);
-      const res = await fetch('https://url-shortener.luizbizzio.workers.dev/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, url: input })
-      });
-
-      if (res.ok) {
-        const shortUrl = `https://url-shortener.luizbizzio.workers.dev/${code}`;
-        document.getElementById('result').innerHTML = `
-          <p>Shortened URL:</p>
-          <a href="${shortUrl}" target="_blank">${shortUrl}</a>
-        `;
-      } else {
-        const msg = await res.text();
-        alert('Failed to shorten URL: ' + msg);
-      }
-    }
-  </script>
+async function shorten(){
+  const url=document.getElementById('long').value.trim();
+  if(!/^https?:\/\//i.test(url)){alert('Insira URL válida');return;}
+  const ttl=parseInt(document.getElementById('ttl').value,10);
+  const code=await hash(url);
+  const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,url,ttl})});
+  if(res.ok){
+     const short=`${API}${code}`;
+     document.getElementById('result').innerHTML=`<a href="${short}" target="_blank">${short}</a>`;
+  }else{
+     alert('Erro ao encurtar: '+await res.text());
+  }
+}
+</script>
 </body>
 </html>
