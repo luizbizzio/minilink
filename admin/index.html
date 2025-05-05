@@ -1,62 +1,128 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Shortener Admin</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/feather-icons@4.29.1/dist/feather.min.css" />
+
 <style>
- body{font-family:system-ui;background:#fafafa;padding:40px}
- table{border-collapse:collapse;width:100%;margin-top:20px}
- th,td{padding:8px;border:1px solid #ddd;font-size:14px}
- button{padding:4px 10px;background:#e00;color:#fff;border:none;border-radius:4px;cursor:pointer}
- #login{display:flex;flex-direction:column;gap:8px;max-width:300px;margin:auto}
+:root{
+  --primary:#0066ff;
+  --bg:#f2f5fa;
+  --card:#fff;
+  --text:#222;
+  --radius:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:Inter,system-ui,sans-serif;
+  background:var(--bg);
+  min-height:100vh;
+  display:flex;justify-content:center;align-items:flex-start;
+  padding:40px 12px;
+}
+.card{
+  width:100%;max-width:960px;
+  background:var(--card);
+  border-radius:var(--radius);
+  padding:32px 28px 40px;
+  box-shadow:0 8px 24px rgba(0,0,0,.08);
+}
+h1{font-size:1.6rem;margin-bottom:24px;color:var(--text)}
+input,button{
+  padding:10px 14px;font-size:15px;border-radius:8px;border:1px solid #ccd4e0;
+}
+button{
+  background:var(--primary);color:#fff;border:none;cursor:pointer;transition:.2s;
+}
+button:hover{background:#0056da}
+table{width:100%;border-collapse:collapse;margin-top:24px;font-size:14px}
+th,td{padding:10px;border-bottom:1px solid #e5e9f0;text-align:left}
+th{background:#f0f4ff;font-weight:600}
+.badge{padding:2px 6px;border-radius:4px;font-size:12px}
+.badge.red{background:#ffe5e5;color:#d40000}
+.badge.green{background:#e2fde2;color:#006b00}
+small{font-size:12px;color:#666}
+.logs{font-size:13px;margin-top:6px;color:#444;line-height:1.35}
+.logs span{display:inline-block;margin-right:4px}
 </style>
 </head>
 <body>
-<div id="app"></div>
 
+<div class="card" id="app">
+  <h1>Admin Login</h1>
+  <input id="tok" type="password" placeholder="Admin token" style="width:260px" />
+  <button onclick="login()" style="margin-left:8px">Enter</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/feather-icons@4.29.1/dist/feather.min.js"></script>
 <script>
-const ENDPOINT='https://url-shortener.luizbizzio.workers.dev';
-let TOKEN='';
+const ENDPOINT = 'https://url-shortener.luizbizzio.workers.dev';
+let TOKEN = '';
 
-function uiLogin(){
- app.innerHTML=`<div id="login">
-   <h2>Admin Login</h2>
-   <input id="tok" type="password" placeholder="Admin token">
-   <button onclick="login()">Enter</button>
- </div>`;
+function login(){
+  TOKEN = document.getElementById('tok').value.trim();
+  loadList();
 }
-async function login(){
- TOKEN=document.getElementById('tok').value.trim();
- loadLinks();
+
+async function loadList(){
+  app.innerHTML = '<h1>Loading…</h1>';
+  const res = await fetch(ENDPOINT+'/api/list',{headers:{'X-Admin-Token':TOKEN}});
+  if(!res.ok){app.innerHTML='<h1>Invalid token</h1>';return;}
+  const list = await res.json();
+  renderTable(list);
 }
-async function loadLinks(){
- const res=await fetch(ENDPOINT+'/api/list',{headers:{'X-Admin-Token':TOKEN}});
- if(!res.ok){alert('Invalid token');uiLogin();return;}
- const data=await res.json();
- renderTable(data);
+
+async function renderTable(arr){
+  let rows='';
+  for(const o of arr){
+    const stats = await fetch(`${ENDPOINT}/api/stats/${o.code}`,{
+      headers:{'X-Admin-Token':TOKEN}}).then(r=>r.json());
+    const left = o.expiresIn!=null ? format(o.expiresIn) : '∞';
+    rows += `
+      <tr>
+        <td><a href="${ENDPOINT}/${o.code}" target="_blank">${o.code}</a></td>
+        <td>${o.url}</td>
+        <td>${stats.clicks}</td>
+        <td>${left}</td>
+        <td>${logsHtml(stats.logs)}</td>
+        <td><button onclick="del('${o.code}')"><i data-feather="trash-2" size="14"></i></button></td>
+      </tr>`;
+  }
+
+  app.innerHTML = `
+    <h1>All Links</h1>
+    <table>
+      <tr><th>Slug</th><th>Destination</th><th>Clicks</th><th>Expires in</th><th>Last hits</th><th></th></tr>
+      ${rows}
+    </table>`;
+  feather.replace();
 }
-function renderTable(arr){
- app.innerHTML=`<h2>All Links</h2>
- <table><tr><th>Code</th><th>URL</th><th>Expires in</th><th></th></tr>
- ${arr.map(o=>`<tr>
-   <td><a href="${ENDPOINT}/${o.code}" target="_blank">${o.code}</a></td>
-   <td>${o.url}</td>
-   <td>${o.expiresIn?format(o.expiresIn):'∞'}</td>
-   <td><button onclick="del('${o.code}')">Delete</button></td></tr>`).join('')}
- </table>`;
+
+function format(sec){
+  if(sec<=0) return '<span class="badge red">expired</span>';
+  const d=Math.floor(sec/86400);const h=Math.floor(sec%86400/3600);
+  const m=Math.floor(sec%3600/60);
+  return `<span class="badge green">${d?d+'d ':''}${h?h+'h ':''}${m?m+'m':''}</span>`;
 }
-function format(s){
- if(s<=0)return 'expired';
- const d=Math.floor(s/86400); const h=Math.floor(s%86400/3600);
- const m=Math.floor(s%3600/60);
- return `${d?d+'d ':''}${h?h+'h ':''}${m?m+'m':''}`;
+
+function logsHtml(arr){
+  if(!arr.length) return '<small>—</small>';
+  return arr.slice(0,3).map(l=>{
+    const d=new Date(l.t).toLocaleString().replace(',','');
+    return `<div class="logs"><span>📍 ${l.loc}</span><span>${l.ip}</span><span>${d}</span></div>`;
+  }).join('');
 }
+
 async function del(code){
- if(!confirm('Delete '+code+' ?'))return;
- await fetch(ENDPOINT+'/api/delete/'+code,{method:'DELETE',headers:{'X-Admin-Token':TOKEN}});
- loadLinks();
+  if(!confirm('Delete '+code+' ?'))return;
+  await fetch(`${ENDPOINT}/api/delete/${code}`,{
+    method:'DELETE',headers:{'X-Admin-Token':TOKEN}});
+  loadList();
 }
-uiLogin();
 </script>
 </body>
 </html>
