@@ -1,5 +1,6 @@
 name = "url-shortener"
 type = "javascript"
+compatibility_date = "2025-05-06"
 
 kv_namespaces = [
   { binding = "LINKS",     id = "a2774cd1a1374de49b12c0d62e255fcd" },
