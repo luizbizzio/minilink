@@ -148,7 +148,7 @@ export default {
       return Response.redirect(dest,302);
     }
 
-    return new Response('OK',{status:200,headers:cors});
+    return env.ASSETS.fetch(req);
   }
 };
 
