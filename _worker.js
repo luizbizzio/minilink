@@ -110,7 +110,7 @@ export async function onRequest(context) {
   }
 
   // ─────── Criar link (POST /) ───────
-  if (meth==='POST') {
+  if (meth === 'POST' && path === '') {
     try {
       const { code, url: longUrl, ttl } = await request.json();
       if (!code || !longUrl || !/^https?:\/\//i.test(longUrl)) {
