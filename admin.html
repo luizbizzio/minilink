@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shortener Admin</title>
+<style>
+ body{font-family:system-ui;background:#fafafa;padding:40px}
+ table{border-collapse:collapse;width:100%;margin-top:20px}
+ th,td{padding:8px;border:1px solid #ddd;font-size:14px}
+ button{padding:4px 10px;background:#e00;color:#fff;border:none;border-radius:4px;cursor:pointer}
+ #login{display:flex;flex-direction:column;gap:8px;max-width:300px;margin:auto}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+const ENDPOINT='https://url-shortener.luizbizzio.workers.dev';
+let TOKEN='';
+
+function uiLogin(){
+ app.innerHTML=`<div id="login">
+   <h2>Admin Login</h2>
+   <input id="tok" type="password" placeholder="Admin token">
+   <button onclick="login()">Enter</button>
+ </div>`;
+}
+async function login(){
+ TOKEN=document.getElementById('tok').value.trim();
+ loadLinks();
+}
+async function loadLinks(){
+ const res=await fetch(ENDPOINT+'/api/list',{headers:{'X-Admin-Token':TOKEN}});
+ if(!res.ok){alert('Invalid token');uiLogin();return;}
+ const data=await res.json();
+ renderTable(data);
+}
+function renderTable(arr){
+ app.innerHTML=`<h2>All Links</h2>
+ <table><tr><th>Code</th><th>URL</th><th>Expires in</th><th></th></tr>
+ ${arr.map(o=>`<tr>
+   <td><a href="${ENDPOINT}/${o.code}" target="_blank">${o.code}</a></td>
+   <td>${o.url}</td>
+   <td>${o.expiresIn?format(o.expiresIn):'∞'}</td>
+   <td><button onclick="del('${o.code}')">Delete</button></td></tr>`).join('')}
+ </table>`;
+}
+function format(s){
+ if(s<=0)return 'expired';
+ const d=Math.floor(s/86400); const h=Math.floor(s%86400/3600);
+ const m=Math.floor(s%3600/60);
+ return `${d?d+'d ':''}${h?h+'h ':''}${m?m+'m':''}`;
+}
+async function del(code){
+ if(!confirm('Delete '+code+' ?'))return;
+ await fetch(ENDPOINT+'/api/delete/'+code,{method:'DELETE',headers:{'X-Admin-Token':TOKEN}});
+ loadLinks();
+}
+uiLogin();
+</script>
+</body>
+</html>
