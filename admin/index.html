@@ -48,11 +48,20 @@ td:last-child{width:60px;text-align:center}
 <script src="https://cdn.jsdelivr.net/npm/feather-icons@4.29.1/dist/feather.min.js"></script>
 <script>
 const ENDPOINT ='https://url-shortener.luizbizzio.workers.dev';
-let TOKEN='';
+let TOKEN = '';
+const savedToken = localStorage.getItem('admin_token');
+if (savedToken) {
+  TOKEN = savedToken;
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('tok').value = savedToken;
+    loadList();
+  });
+}
 
 function login(){
-  TOKEN=document.getElementById('tok').value.trim();
-  if(!TOKEN) return;
+  TOKEN = document.getElementById('tok').value.trim();
+  if (!TOKEN) return;
+  localStorage.setItem('admin_token', TOKEN);
   loadList();
 }
 
