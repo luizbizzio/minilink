@@ -179,7 +179,10 @@ export async function onRequest(context) {
   }
 
   // ─────── estáticos ───────
+  if (meth === 'GET') {
   return env.ASSETS.fetch(request);
+}
+return new Response('Method Not Allowed', { status: 405 });
 }
 
 /* ────── helpers ────── */
