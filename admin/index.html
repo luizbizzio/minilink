@@ -1,23 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Shortener Admin</title>
-<meta name="robots" content="noindex" />
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shortener Admin</title><meta name="robots" content="noindex">
 
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/feather-icons@4.29.1/dist/feather.min.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/feather-icons@4.29.1/dist/feather.min.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://twemoji.maxcdn.com/v/latest/twemoji.min.js" defer></script>
 
 <style>
 :root{--primary:#0066ff;--bg:#f2f5fa;--card:#fff;--text:#222;--radius:14px}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Inter,sans-serif;background:var(--bg);min-height:100vh;
-     display:flex;justify-content:center;align-items:flex-start;padding:40px 12px}
-.card{width:100%;max-width:1000px;background:var(--card);border-radius:var(--radius);
-      padding:32px 28px 40px;box-shadow:0 8px 24px rgba(0,0,0,.08)}
+body{font-family:Inter,sans-serif;background:var(--bg);min-height:100vh;display:flex;justify-content:center;align-items:flex-start;padding:40px 12px}
+.card{width:100%;max-width:1000px;background:var(--card);border-radius:var(--radius);padding:32px 28px 40px;box-shadow:0 8px 24px rgba(0,0,0,.08)}
 h1{font-size:1.6rem;margin-bottom:24px;color:var(--text)}
 table{width:100%;border-collapse:collapse;font-size:14px}
 th,td{padding:10px 8px;border-bottom:1px solid #e5e9f0;text-align:left;vertical-align:top}
@@ -27,49 +23,40 @@ td a{color:var(--primary);text-decoration:none;cursor:pointer}
 .badge.red{background:#ffe5e5;color:#d40000}
 .badge.green{background:#e2fde2;color:#006b00}
 .logs{font-size:12.5px;color:#444;line-height:1.35}
-.icon-del{background:#ff5757;border:none;border-radius:6px;width:34px;height:34px;
-          display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.2s}
+.icon-del{background:#ff5757;border:none;border-radius:6px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.2s}
 .icon-del:hover{background:#e14a4a}
 .icon-del i{color:#fff;width:16px;height:16px}
 td:last-child{width:60px;text-align:center}
 @media(max-width:680px){
-  table,thead,tbody,tr,th,td{display:block}
-  th{display:none}
-  tr{margin-bottom:18px}
-  td{border:none;padding:6px 4px}
-  td:last-child{text-align:right}
+ table,thead,tbody,tr,th,td{display:block}th{display:none}tr{margin-bottom:18px}
+ td{border:none;padding:6px 4px}td:last-child{text-align:right}
 }
-
 /* modal */
-#overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);
-         align-items:center;justify-content:center;z-index:999}
-#modal{position:absolute;background:#fff;border-radius:16px;max-width:920px;width:95%;padding:24px;box-shadow:0 10px 28px rgba(0,0,0,.15)}
-#modal h2{margin:0 0 16px;font-size:1.4rem}
+#overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);align-items:center;justify-content:center;z-index:999}
+#modal{position:relative;background:#fff;border-radius:16px;max-width:920px;width:95%;padding:24px;box-shadow:0 10px 28px rgba(0,0,0,.15)}
 #chart{max-width:880px;height:260px;margin-bottom:24px}
-#map{width:100%;max-width:880px;height:380px;border-radius:14px;box-shadow:0 4px 18px rgba(0,0,0,.1)}
-.close{position:absolute;top:12px;right:20px;font-size:26px;cursor:pointer;border:none;background:none;color:#777}
+#map{width:100%;max-width:880px;height:400px;border-radius:14px;box-shadow:0 4px 18px rgba(0,0,0,.1)}
+.close{position:absolute;top:10px;right:16px;font-size:28px;cursor:pointer;border:none;background:none;color:#777}
 .close:hover{color:#000}
 </style>
 </head>
 <body>
 
 <div class="card" id="app">
-  <h1>Admin Login</h1>
-  <input id="tok" type="password" placeholder="Admin token" style="width:260px">
-  <label style="display:block;margin:6px 0 12px">
-    <input type="checkbox" id="remember"> Remember me
-  </label>
-  <button onclick="login()">Enter</button>
+ <h1>Admin Login</h1>
+ <input id="tok" type="password" placeholder="Admin token" style="width:260px">
+ <label style="display:block;margin:6px 0 12px"><input type="checkbox" id="remember"> Remember me</label>
+ <button onclick="login()">Enter</button>
 </div>
 
 <!-- modal -->
 <div id="overlay">
-  <div id="modal">
-    <button class="close" onclick="closeModal()">&times;</button>
-    <h2 id="mTitle"></h2>
-    <canvas id="chart"></canvas>
-    <div id="map"></div>
-  </div>
+ <div id="modal">
+   <button class="close" onclick="closeModal()" aria-label="close">&times;</button>
+   <h2 id="mTitle"></h2>
+   <canvas id="chart"></canvas>
+   <div id="map"></div>
+ </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/feather-icons@4.29.1/dist/feather.min.js"></script>
@@ -79,110 +66,94 @@ td:last-child{width:60px;text-align:center}
 
 <script>
 const ENDPOINT='https://url-shortener.luizbizzio.workers.dev';
-let TOKEN = localStorage.getItem('admin_token') || '';
-
-if (TOKEN) loadList();
+let TOKEN=localStorage.getItem('admin_token')||'';
+if(TOKEN)loadList();
 
 function login(){
-  TOKEN=document.getElementById('tok').value.trim();
-  if(!TOKEN) return;
-  if(document.getElementById('remember').checked)
-    localStorage.setItem('admin_token',TOKEN);
-  loadList();
+ TOKEN=document.getElementById('tok').value.trim();
+ if(!TOKEN)return;
+ if(document.getElementById('remember').checked) localStorage.setItem('admin_token',TOKEN);
+ loadList();
 }
 
 async function loadList(){
-  app.innerHTML='<h1 style="margin-bottom:0">Loading…</h1>';
-  const res=await fetch(ENDPOINT+'/api/list',{headers:{'X-Admin-Token':TOKEN}});
-  if(!res.ok){app.innerHTML='<h1>Invalid token</h1>';return;}
-  const list=await res.json();
-  renderTable(list);
+ app.innerHTML='<h1 style="margin-bottom:0">Loading…</h1>';
+ const res=await fetch(`${ENDPOINT}/api/list`,{headers:{'X-Admin-Token':TOKEN}});
+ if(!res.ok){app.innerHTML='<h1>Invalid token</h1>';return;}
+ renderTable(await res.json());
 }
 
-function badge(sec){
-  if(sec<=0) return '<span class="badge red">expired</span>';
-  const d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),m=Math.floor(sec%3600/60);
-  return `<span class="badge green">${d?d+'d ':''}${h?h+'h ':''}${m?m+'m':''}</span>`;
-}
-function flag(cc){
-  if(!cc || cc.length!==2) return '';
-  return `<img src="https://flagcdn.com/24x18/${cc.toLowerCase()}.png"
-               width="24" height="18" style="vertical-align:-3px">`;
-}
-function logsHtml(arr){
-  if(!arr || !arr.length) return '<small>—</small>';
-  return arr.slice(0,3).map(l=>{
-    const date=new Date(l.t).toLocaleString().replace(',','');
-    return `<div class="logs">${flag(l.loc)} ${l.loc} ${l.ip}<br>${date}</div>`;
-  }).join('');
-}
+function badge(s){if(s<=0)return'<span class="badge red">expired</span>';const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return`<span class="badge green">${d?d+'d ':''}${h?h+'h ':''}${m?m+'m':''}</span>`}
+function flag(cc){return cc&&cc.length===2?`<img src="https://flagcdn.com/24x18/${cc.toLowerCase()}.png" width="24" height="18" style="vertical-align:-3px">`:''}
+function logsHtml(a){return!a||!a.length?'<small>—</small>':a.slice(0,3).map(l=>`<div class="logs">${flag(l.loc)} ${l.loc} ${l.ip}<br>${new Date(l.t).toLocaleString().replace(',','')}</div>`).join('')}
 
 async function renderTable(arr){
-  let rows='';
-  for(const o of arr){
-    const stats=await fetch(`${ENDPOINT}/api/stats/${o.code}`,{headers:{'X-Admin-Token':TOKEN}}).then(r=>r.json());
-    rows+=`
-      <tr>
-        <td><a onclick="openDetail('${o.code}')" >${o.code}</a></td>
-        <td><a href="${o.url}">${o.url||'-'}</a></td>
-        <td>${stats.clicks||0}</td>
-        <td>${o.expiresIn!=null?badge(o.expiresIn):'∞'}</td>
-        <td>${o.created?new Date(o.created).toLocaleString():'-'}</td>
-        <td>${logsHtml(stats.logs)}</td>
-        <td><button class="icon-del" onclick="del('${o.code}')"><i data-feather="trash-2"></i></button></td>
-      </tr>`;}
-  app.innerHTML=`
-    <h1>All Links</h1>
-    <table>
-      <thead><tr>
-        <th>Slug</th><th>Destination</th><th>Clicks</th>
-        <th>Expires</th><th>Created</th><th>Last hits</th><th></th>
-      </tr></thead><tbody>${rows}</tbody>
-    </table>`;
-  feather.replace();
-twemoji.parse(app);
+ let rows='';
+ for(const o of arr){
+   const st=await fetch(`${ENDPOINT}/api/stats/${o.code}`,{headers:{'X-Admin-Token':TOKEN}}).then(r=>r.json());
+   rows+=`<tr>
+     <td><a onclick="openDetail('${o.code}')" >${o.code}</a></td>
+     <td><a href="${o.url}" target="_blank">${o.url||'-'}</a></td>
+     <td>${st.clicks||0}</td>
+     <td>${o.expiresIn!=null?badge(o.expiresIn):'∞'}</td>
+     <td>${o.created?new Date(o.created).toLocaleString():'-'}</td>
+     <td>${logsHtml(st.logs)}</td>
+     <td><button class="icon-del" onclick="del('${o.code}')"><i data-feather="trash-2"></i></button></td>
+   </tr>`;
+ }
+ app.innerHTML=`<h1>All Links</h1><table><thead><tr>
+   <th>Slug</th><th>Destination</th><th>Clicks</th><th>Expires</th><th>Created</th><th>Last hits</th><th></th>
+   </tr></thead><tbody>${rows}</tbody></table>`;
+ feather.replace(); twemoji.parse(app);
 }
 
-/* -------- popup detail -------- */
+/* -------- popup -------- */
 async function openDetail(slug){
-  document.getElementById('overlay').style.display='flex';
-  document.getElementById('mTitle').textContent='Stats – '+slug;
+ overlay.style.display='flex';
+ mTitle.textContent='Stats – '+slug;
 
-  const res=await fetch(`${ENDPOINT}/api/detail/${slug}`,{headers:{'X-Admin-Token':TOKEN}});
-  if(!res.ok){alert('error');closeModal();return;}
-  const data=await res.json();
+ const res=await fetch(`${ENDPOINT}/api/detail/${slug}`,{headers:{'X-Admin-Token':TOKEN}});
+ if(!res.ok){alert('Error');closeModal();return;}
+ const data=await res.json();
 
-  /* chart */
-  const ctx=document.getElementById('chart');
-  ctx.replaceWith(ctx.cloneNode(true));                 // reset canvas
-  const canvas=document.getElementById('chart');
-  const labels=Object.keys(data.byDay).sort();
-  const values=labels.map(d=>data.byDay[d]);
-  new Chart(canvas,{
-    type:'line',
-    data:{labels:labels.map(d=>`${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6)}`),
-          datasets:[{data:values,fill:false,tension:0.3}]},
-    options:{plugins:{legend:{display:false}},responsive:true}
-  });
+ /* chart */
+ chart.replaceWith(chart.cloneNode(true));
+ const ctx=document.getElementById('chart');
+ const useHour=Object.keys(data.byHour||{}).length;
+ const labels=(useHour?Object.keys(data.byHour):Object.keys(data.byDay)).sort();
+ const values=labels.map(l=>useHour?data.byHour[l]:data.byDay[l]);
+ new Chart(ctx,{type:'line',
+   data:{labels:useHour?labels.map(h=>h+':00'):labels.map(d=>`${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6)}`),
+         datasets:[{data:values,fill:false,tension:0.3}]},
+   options:{responsive:true,plugins:{legend:{display:false},
+     tooltip:{callbacks:{afterLabel:ctx=>{
+       const label=ctx.label, isH=useHour;
+       const hits=data.logs.filter(l=>{
+         const d=new Date(l.t);
+         return isH?d.getHours()==label.split(':')[0]:d.toISOString().slice(0,10).replace(/-/g,'')===label.replace(/-/g,'');
+       });
+       return hits.map(l=>`${l.loc} ${l.ip}`);
+     }}}}}
+ });
 
-  /* map */
-  const mapDiv=document.getElementById('map');
-  mapDiv.replaceWith(mapDiv.cloneNode(true));
-  const map=L.map('map',{worldCopyJump:true}).setView([20,0],2);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    {attribution:'© OSM'}).addTo(map);
-  if(data.points&&data.points.length){
-    const heat=data.points.map(([lat,lon])=>[lat,lon,0.6]);
-    L.heatLayer(heat,{radius:25}).addTo(map);
-  }
+ /* map */
+ map.replaceWith(map.cloneNode(true));
+ const m=L.map('map',{worldCopyJump:true}).setView([20,0],2);
+ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(m);
+ if(data.points&&data.points.length){
+   L.heatLayer(data.points.map(p=>[p[0],p[1],0.6]),{radius:25}).addTo(m);
+   data.points.forEach(p=>{
+     L.circleMarker(p,{radius:5,fillOpacity:0.8,color:'#ff5722'}).addTo(m);
+   });
+ }
 }
 
-function closeModal(){document.getElementById('overlay').style.display='none';}
+function closeModal(){overlay.style.display='none';}
 
 async function del(code){
-  if(!confirm('Delete '+code+' ?'))return;
-  await fetch(`${ENDPOINT}/api/delete/${code}`,{method:'DELETE',headers:{'X-Admin-Token':TOKEN}});
-  loadList();
+ if(!confirm('Delete '+code+' ?'))return;
+ await fetch(`${ENDPOINT}/api/delete/${code}`,{method:'DELETE',headers:{'X-Admin-Token':TOKEN}});
+ loadList();
 }
 </script>
 </body>
