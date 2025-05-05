@@ -1,5 +1,5 @@
-name = "url-shortener-pages"
-pages_build_output_dir = "."
+name = "url-shortener"
+type = "javascript"
 
 kv_namespaces = [
   { binding = "LINKS",     id = "a2774cd1a1374de49b12c0d62e255fcd" },
@@ -8,3 +8,7 @@ kv_namespaces = [
   { binding = "LOGS",      id = "de01551a3b504205b5712da796f010fd" },
   { binding = "GEO",       id = "2a629d3120dc498fae067825c640343f" }
 ]
+
+[site]
+bucket = "./"
+entry-point = "."
