@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>URL Shortener</title>
   <style>
     body {
@@ -12,89 +12,69 @@
       align-items: center;
       justify-content: center;
       height: 100vh;
-      margin: 0;
-      background-color: #f4f4f4;
+      background: #f2f2f2;
     }
-    h1 { margin-bottom: 10px; }
-    input {
+    h1 { margin-bottom: 20px; }
+    input, button {
       padding: 10px;
+      font-size: 16px;
+      margin: 5px;
       width: 300px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
     }
     button {
-      padding: 10px 20px;
-      margin-top: 10px;
       background-color: #007BFF;
       color: white;
       border: none;
       border-radius: 5px;
       cursor: pointer;
     }
-    #result { margin-top: 20px; word-break: break-all; }
+    #result {
+      margin-top: 20px;
+      word-break: break-word;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
-  <div id="app">
-    <h1>URL Shortener</h1>
-    <input type="text" id="input" placeholder="Paste a URL here..." />
-    <button id="shortenBtn">Shorten</button>
-    <div id="result"></div>
-  </div>
+  <h1>Cloudflare URL Shortener</h1>
+  <input type="text" id="input" placeholder="Enter a long URL..." />
+  <button onclick="shorten()">Shorten</button>
+  <div id="result"></div>
 
   <script>
-    async function makeCode(url) {
+    async function generateCode(url) {
       const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(url));
       return [...new Uint8Array(buf)]
         .map(b => b.toString(16).padStart(2, '0'))
-        .join('').slice(0, 6);
+        .join('')
+        .slice(0, 6);
     }
 
-    async function send(code, longUrl) {
-      await fetch('https://url-shortener.luizbizzio.workers.dev', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, url: longUrl })
-      });
-    }
-
-    document.getElementById('shortenBtn').onclick = async () => {
+    async function shorten() {
       const input = document.getElementById('input').value.trim();
       if (!/^https?:\/\//i.test(input)) {
-        alert('Enter a valid URL starting with http or https');
+        alert('Please enter a valid URL starting with http:// or https://');
         return;
       }
 
-      const code = await makeCode(input);
-      await send(code, input);
+      const code = await generateCode(input);
+      const res = await fetch('https://url-shortener.luizbizzio.workers.dev/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, url: input })
+      });
 
-      const short = `${location.origin}${location.pathname}${code}`;
-      document.getElementById('result').innerHTML =
-        `<p>Shortened URL:</p><a href="${short}" target="_blank">${short}</a>`;
-    };
-
-    (async () => {
-    const pathname = location.pathname;
-    const slug = pathname.startsWith('/url-shortener/') ? pathname.replace('/url-shortener/', '') : pathname.replace(/^\/+/, '');
-    
-    if (!slug || slug === '' || slug === 'index.html' || slug.includes('.')) return;
-    
-      try {
-        const res = await fetch('links.json', { cache: 'no-store' });
-        if (!res.ok) throw new Error('links.json not found');
-    
-        const map = await res.json();
-        if (map[slug]) {
-          location.replace(map[slug]);
-        } else {
-          document.body.textContent = 'Short link not found.';
-        }
-      } catch (err) {
-        console.error('Error loading links.json:', err);
-        document.body.textContent = 'Link data not available.';
+      if (res.ok) {
+        const shortUrl = `https://url-shortener.luizbizzio.workers.dev/${code}`;
+        document.getElementById('result').innerHTML = `
+          <p>Shortened URL:</p>
+          <a href="${shortUrl}" target="_blank">${shortUrl}</a>
+        `;
+      } else {
+        const msg = await res.text();
+        alert('Failed to shorten URL: ' + msg);
       }
-    })();
-    
+    }
   </script>
 </body>
 </html>
