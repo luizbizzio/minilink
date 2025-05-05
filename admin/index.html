@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/feather-icons@4.29.1/dist/feather.min.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://twemoji.maxcdn.com/v/latest/twemoji.min.js" defer></script>
 
 <style>
 :root{--primary:#0066ff;--bg:#f2f5fa;--card:#fff;--text:#222;--radius:14px}
@@ -104,9 +105,9 @@ function badge(sec){
   return `<span class="badge green">${d?d+'d ':''}${h?h+'h ':''}${m?m+'m':''}</span>`;
 }
 function flag(cc){
-  if(!cc||cc.length!==2) return '🏳️';
-  const up=cc.toUpperCase();
-  return String.fromCodePoint(0x1F1E6+up.charCodeAt(0)-65,0x1F1E6+up.charCodeAt(1)-65);
+  if(!cc || cc.length!==2) return '';
+  return `<img src="https://flagcdn.com/24x18/${cc.toLowerCase()}.png"
+               width="24" height="18" style="vertical-align:-3px">`;
 }
 function logsHtml(arr){
   if(!arr || !arr.length) return '<small>—</small>';
@@ -139,6 +140,7 @@ async function renderTable(arr){
       </tr></thead><tbody>${rows}</tbody>
     </table>`;
   feather.replace();
+twemoji.parse(app);
 }
 
 /* -------- popup detail -------- */
