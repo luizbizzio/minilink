@@ -43,45 +43,63 @@
   <div id="app"></div>
 
   <script>
-    // Base62 encoding characters
-    const BASE62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    // LZ-based compression using lz-string (standalone minimal implementation)
+    const LZString = {
+      compressToUint8Array: function(input) {
+        const keyStr = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+        let output = "";
+        let chr1, chr2, chr3;
+        let enc1, enc2, enc3, enc4;
+        let i = 0;
 
-    function toBase62(uint8Array) {
-      let bigint = BigInt(0);
-      for (let i = 0; i < uint8Array.length; i++) {
-        bigint = (bigint << BigInt(8)) + BigInt(uint8Array[i]);
-      }
-      let output = "";
-      while (bigint > 0) {
-        output = BASE62[bigint % BigInt(62)] + output;
-        bigint = bigint / BigInt(62);
-      }
-      return output;
-    }
+        const bytes = new TextEncoder().encode(input);
+        const len = bytes.length;
+        const base64 = [];
 
-    function fromBase62(str) {
-      let bigint = BigInt(0);
-      for (let char of str) {
-        bigint = bigint * BigInt(62) + BigInt(BASE62.indexOf(char));
+        while (i < len) {
+          chr1 = bytes[i++];
+          chr2 = i < len ? bytes[i++] : Number.NaN;
+          chr3 = i < len ? bytes[i++] : Number.NaN;
+
+          enc1 = chr1 >> 2;
+          enc2 = ((chr1 & 3) << 4) | (chr2 >> 4);
+          enc3 = ((chr2 & 15) << 2) | (chr3 >> 6);
+          enc4 = chr3 & 63;
+
+          if (isNaN(chr2)) enc3 = enc4 = 64;
+          else if (isNaN(chr3)) enc4 = 64;
+
+          base64.push(
+            keyStr.charAt(enc1) +
+            keyStr.charAt(enc2) +
+            keyStr.charAt(enc3) +
+            keyStr.charAt(enc4)
+          );
+        }
+
+        return base64.join("");
+      },
+
+      decompressFromUint8Array: function(input) {
+        const keyStr = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+        let str = atob(input);
+        const bytes = new Uint8Array(str.length);
+        for (let i = 0; i < str.length; i++) {
+          bytes[i] = str.charCodeAt(i);
+        }
+        return new TextDecoder().decode(bytes);
       }
-      const bytes = [];
-      while (bigint > 0) {
-        bytes.unshift(Number(bigint % BigInt(256)));
-        bigint = bigint / BigInt(256);
-      }
-      return new Uint8Array(bytes);
-    }
+    };
 
     function encodeUrl(url) {
-      const encoder = new TextEncoder();
-      const bytes = encoder.encode(url);
-      return toBase62(bytes);
+      const compressed = LZString.compressToUint8Array(url);
+      return btoa(compressed).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
     }
 
-    function decodeUrl(base62) {
-      const bytes = fromBase62(base62);
-      const decoder = new TextDecoder();
-      return decoder.decode(bytes);
+    function decodeUrl(base64url) {
+      const padded = base64url.replace(/-/g, "+").replace(/_/g, "/");
+      const decompressed = atob(padded);
+      return new TextDecoder().decode(Uint8Array.from(decompressed, c => c.charCodeAt(0)));
     }
 
     function decodeAndRedirect() {
