@@ -33,7 +33,7 @@ export default {
     }
 
     // — Tudo o resto: serve estáticos de public/ —
-    return env.__STATIC_CONTENT.fetch(request);
+    return env.ASSETS.fetch(request);
   }
 };
 
