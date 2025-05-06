@@ -1,11 +1,11 @@
 name               = "url-shortener"
-account_id         = "a066844077244b45b82f11e69a57a4a9"  # ← seu Account ID
-type               = "javascript"                     # ← ativa Worker Assets
+type               = "javascript"
 main               = "_worker.js"
 compatibility_date = "2025-05-06"
 
-[assets]
-directory = "./public"
+[site]
+bucket  = "./public"
+include = ["**/*"]
 
 kv_namespaces = [
   { binding = "LINKS",     id = "a2774cd1a1374de49b12c0d62e255fcd" },
