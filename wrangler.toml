@@ -1,4 +1,6 @@
 name               = "url-shortener"
+account_id         = "a066844077244b45b82f11e69a57a4a9"  # ← seu Account ID
+type               = "javascript"                     # ← ativa Worker Assets
 main               = "_worker.js"
 compatibility_date = "2025-05-06"
 
