@@ -12,7 +12,3 @@ kv_namespaces = [
   { binding = "LOGS",      id = "de01551a3b504205b5712da796f010fd" },
   { binding = "GEO",       id = "2a629d3120dc498fae067825c640343f" }
 ]
-
-[site]
-bucket  = "./public"
-include = ["**/*"]
