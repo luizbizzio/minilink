@@ -11,7 +11,7 @@ const CENTROID = {
   GB: [54, -2], DE: [51, 10], IN: [22, 79]
 };
 
-async function onRequest({ request, env }) {
+async function onRequest({ request, env, context }) {
   const url = new URL(request.url);
   const path = url.pathname.replace(/^\/+/, '');
   const meth = request.method;
@@ -26,6 +26,7 @@ async function onRequest({ request, env }) {
     if (request.headers.get('X-Admin-Token') !== env.ADMIN_TOKEN) {
       return json({ error: 'Forbidden' }, 403);
     }
+    // GET /api/list
     if (meth === 'GET' && path === 'api/list') {
       const list = await env.LINKS.list();
       const items = await Promise.all(
@@ -44,6 +45,7 @@ async function onRequest({ request, env }) {
       );
       return json(items);
     }
+    // GET /api/stats/:slug
     if (meth === 'GET' && /^api\/stats\/[a-z0-9]{6}$/i.test(path)) {
       const slug = path.split('/').pop();
       const creator = (await env.LINKS.getWithMetadata(slug)).metadata?.creator || null;
@@ -53,11 +55,13 @@ async function onRequest({ request, env }) {
         creator
       });
     }
+    // GET /api/detail/:slug
     if (meth === 'GET' && /^api\/detail\/[a-z0-9]{6}$/i.test(path)) {
-      // existing logic...
+      // detail logic here...
     }
+    // DELETE /api/delete/:slug
     if (meth === 'DELETE' && /^api\/delete\/[a-z0-9]{6}$/i.test(path)) {
-      // existing logic...
+      // delete logic here...
     }
     return json({ error: 'Not found' }, 404);
   }
@@ -102,7 +106,7 @@ async function onRequest({ request, env }) {
       ]);
       return new Response('Not found', { status: 404 });
     }
-    // existing logic...
+    // increment logic here...
     return Response.redirect(dest, 302);
   }
 
@@ -140,6 +144,6 @@ async function pruneDaily(ns, slug) {
 
 export default {
   async fetch(request, env, ctx) {
-    return onRequest({ request, env });
+    return onRequest({ request, env, context: ctx });
   }
 };
