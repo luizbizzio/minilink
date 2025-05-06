@@ -3,7 +3,9 @@ type               = "javascript"
 main               = "_worker.js"
 compatibility_date = "2025-05-06"
 
-site = { bucket = "./public", include = ["**/*"] }
+[site]
+bucket = "./public"
+include = ["**/*"]
 
 kv_namespaces = [
   { binding = "LINKS",     id = "a2774cd1a1374de49b12c0d62e255fcd" },
