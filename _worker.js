@@ -1,5 +1,15 @@
 // _worker.js
 
+// Utility to prune old daily stats
+async function pruneDaily(ns, slug) {
+  const { keys } = await ns.list({ prefix: '', limit: 1000 });
+  await Promise.all(
+    keys
+      .filter(k => k.name.endsWith(':' + slug))
+      .map(k => ns.delete(k.name))
+  );
+}
+
 async function handleRequest(request, env) {
   const url  = new URL(request.url);
   const path = url.pathname.replace(/^\/+/, '');
@@ -7,14 +17,13 @@ async function handleRequest(request, env) {
 
   // ─────── ADMIN API ───────
   if (path.startsWith('api/')) {
-    // Auth
+    // Authentication
     if (request.headers.get('X-Admin-Token') !== env.ADMIN_TOKEN) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' }
       });
     }
-
     // GET /api/list
     if (meth === 'GET' && path === 'api/list') {
       const list = await env.LINKS.list();
@@ -22,13 +31,13 @@ async function handleRequest(request, env) {
         list.keys
           .filter(k => /^[a-z0-9]{6}$/i.test(k.name))
           .map(async k => {
-            const meta = (await env.LINKS.getWithMetadata(k.name)).metadata || {};
+            const { metadata = {} } = await env.LINKS.getWithMetadata(k.name) || {};
             return {
               code: k.name,
               url: await env.LINKS.get(k.name),
-              created: meta.created || 0,
-              creator: meta.creator || null,
-              expiresIn: meta.exp ? meta.exp - Date.now() / 1000 : null
+              created: metadata.created || 0,
+              creator: metadata.creator || null,
+              expiresIn: metadata.exp ? metadata.exp - Date.now()/1000 : null
             };
           })
       );
@@ -37,53 +46,46 @@ async function handleRequest(request, env) {
         headers: { 'Content-Type': 'application/json' }
       });
     }
-
     // GET /api/stats/:slug
     if (meth === 'GET' && /^api\/stats\/[a-z0-9]{6}$/i.test(path)) {
       const slug = path.split('/').pop();
       const clicks = parseInt(await env.STATS.get(slug) || '0', 10);
-      const logs   = JSON.parse(await env.LOGS.get('log:' + slug) || '[]').slice(0, 20);
+      const logs   = JSON.parse(await env.LOGS.get('log:' + slug) || '[]').slice(0,20);
       return new Response(JSON.stringify({ clicks, logs }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
     }
-
     // GET /api/detail/:slug
     if (meth === 'GET' && /^api\/detail\/[a-z0-9]{6}$/i.test(path)) {
       const slug = path.split('/').pop();
-      const totalClicks = parseInt(await env.STATS.get(slug) || '0', 10);
-
-      // byDay for last 30 days
+      const total = parseInt(await env.STATS.get(slug) || '0', 10);
+      const now   = Date.now();
+      // last 30 days
       const byDay = {};
-      const now = Date.now();
       for (let i = 0; i < 30; i++) {
-        const d = new Date(now - i * 864e5).toISOString().slice(0, 10).replace(/-/g, '');
+        const d = new Date(now - i * 864e5).toISOString().slice(0,10).replace(/-/g,'');
         const n = parseInt(await env.STATS_DAY.get(`${d}:${slug}`) || '0', 10);
         if (n) byDay[d] = n;
       }
-
-      // byHour if created <24h
-      const rawLogs = JSON.parse(await env.LOGS.get('log:' + slug) || '[]');
-      const meta    = (await env.LINKS.getWithMetadata(slug)).metadata || {};
-      const created = meta.created || now;
-      const byHour  = {};
+      // byHour if <24h old
+      const raw = JSON.parse(await env.LOGS.get('log:' + slug) || '[]');
+      const { metadata = {} } = await env.LINKS.getWithMetadata(slug) || {};
+      const created = metadata.created || now;
+      const byHour = {};
       if (now - created < 86_400_000) {
-        rawLogs.forEach(l => {
-          const h = new Date(l.t).getHours().toString().padStart(2, '0');
-          byHour[h] = (byHour[h] || 0) + 1;
+        raw.forEach(l => {
+          const h = new Date(l.t).getHours().toString().padStart(2,'0');
+          byHour[h] = (byHour[h]||0) + 1;
         });
       }
-
-      // heat-map points
-      const points = rawLogs.filter(l => l.lat != null).map(l => [l.lat, l.lon]);
-
-      return new Response(JSON.stringify({ totalClicks, byDay, byHour, points, logs: rawLogs.slice(0, 100) }), {
+      // heat points
+      const points = raw.filter(l=>l.lat!=null).map(l=>[l.lat,l.lon]);
+      return new Response(JSON.stringify({ total, byDay, byHour, points, logs: raw.slice(0,100) }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
     }
-
     // DELETE /api/delete/:slug
     if (meth === 'DELETE' && /^api\/delete\/[a-z0-9]{6}$/i.test(path)) {
       const slug = path.split('/').pop();
@@ -98,7 +100,6 @@ async function handleRequest(request, env) {
         headers: { 'Content-Type': 'application/json' }
       });
     }
-
     return new Response(JSON.stringify({ error: 'Not found' }), {
       status: 404,
       headers: { 'Content-Type': 'application/json' }
@@ -107,39 +108,44 @@ async function handleRequest(request, env) {
 
   // ─────── Create link (POST /) ───────
   if (meth === 'POST' && path === '') {
+    let body;
     try {
-      const { code, url: longUrl, ttl } = await request.json();
-      if (!code || !/^https?:\/\//i.test(longUrl)) {
-        return new Response(JSON.stringify({ error: 'bad payload' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-      await Promise.all([
-        env.STATS.delete(code),
-        env.LOGS.delete('log:' + code),
-        pruneDaily(env.STATS_DAY, code)
-      ]);
-      const ttlSec = Math.min(Math.max(ttl ?? 0, 900), 2_592_000);
-      const meta = {
-        created: Date.now(),
-        creator: {
-          ip:  request.headers.get('CF-Connecting-IP'),
-          loc: request.cf?.country || '??'
-        },
-        exp: Date.now() / 1000 + ttlSec
-      };
-      await env.LINKS.put(code, longUrl, { expirationTtl: ttlSec, metadata: meta });
-      return new Response(JSON.stringify({ ok: true, code }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      body = await request.json();
     } catch {
       return new Response(JSON.stringify({ error: 'invalid json' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
     }
+    const { code, url: longUrl, ttl } = body;
+    if (!code || !/^https?:\/\//i.test(longUrl)) {
+      return new Response(JSON.stringify({ error: 'bad payload' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    await Promise.all([
+      env.STATS.delete(code),
+      env.LOGS.delete('log:' + code),
+      pruneDaily(env.STATS_DAY, code)
+    ]);
+    const ttlSec = Math.min(Math.max(ttl ?? 0, 900), 2_592_000);
+    const meta = {
+      created: Date.now(),
+      creator: {
+        ip: request.headers.get('CF-Connecting-IP'),
+        loc: request.cf?.country || '??'
+      },
+      exp: Date.now()/1000 + ttlSec
+    };
+    await env.LINKS.put(code, longUrl, {
+      expirationTtl: ttlSec,
+      metadata: meta
+    });
+    return new Response(JSON.stringify({ ok: true, code }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   // ─────── Redirect /<slug> (GET) ───────
@@ -154,25 +160,22 @@ async function handleRequest(request, env) {
       return new Response('Not found', { status: 404 });
     }
     // increment totals
-    const totKey = path;
-    const total  = parseInt(await env.STATS.get(totKey) || '0', 10) + 1;
-    env.STATS.put(totKey, total.toString());
-    // daily
-    const day = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const dKey = `${day}:${path}`;
-    const perDay = parseInt(await env.STATS_DAY.get(dKey) || '0', 10) + 1;
-    env.STATS_DAY.put(dKey, perDay.toString());
+    const tot      = parseInt(await env.STATS.get(path) || '0',10) + 1;
+    env.STATS.put(path, tot.toString());
+    // increment daily
+    const dayKey  = new Date().toISOString().slice(0,10).replace(/-/g,'') + ':' + path;
+    const daily   = parseInt(await env.STATS_DAY.get(dayKey) || '0',10) + 1;
+    env.STATS_DAY.put(dayKey, daily.toString());
     // log geo
-    let { latitude: lat = null, longitude: lon = null } = request.cf || {};
-    if (lat == null || lon == null) {
+    let { latitude:lat=null, longitude:lon=null } = request.cf || {};
+    if (lat==null||lon==null) {
       const c = CENTROID[request.cf?.country?.toUpperCase()];
-      if (c) [lat, lon] = c;
+      if (c) [lat,lon] = c;
     }
-    const logArr = JSON.parse(await env.LOGS.get('log:' + path) || '[]');
-    logArr.unshift({ t: Date.now(), ip: request.headers.get('CF-Connecting-IP'), loc: request.cf?.country, lat, lon });
-    logArr.length = Math.min(logArr.length, 300);
-    env.LOGS.put('log:' + path, JSON.stringify(logArr));
-
+    const logsArr = JSON.parse(await env.LOGS.get('log:' + path) || '[]');
+    logsArr.unshift({ t: Date.now(), ip: request.headers.get('CF-Connecting-IP'), loc: request.cf?.country, lat, lon });
+    logsArr.length = Math.min(logsArr.length, 300);
+    env.LOGS.put('log:' + path, JSON.stringify(logsArr));
     return Response.redirect(dest, 302);
   }
 
@@ -190,8 +193,3 @@ export default {
     return handleRequest(request, env);
   }
 };
-
-async function pruneDaily(ns, slug) {
-  const { keys } = await ns.list({ prefix: '', limit: 1000 });
-  await Promise.all(keys.filter(k => k.name.endsWith(':' + slug)).map(k => ns.delete(k.name)));
-}
