@@ -6,7 +6,7 @@ const CENTROID = {
 };
 
 async function onRequest({ request, env }) {
-  const url = new URL(request.url);
+  const url  = new URL(request.url);
   const path = url.pathname.replace(/^\/+/, '');
   const meth = request.method;
 
@@ -28,7 +28,9 @@ async function onRequest({ request, env }) {
               url: await env.LINKS.get(k.name),
               created: meta.created || 0,
               creator: meta.creator || null,
-              expiresIn: meta.exp ? meta.exp - Date.now() / 1000 : null
+              expiresIn: meta.exp
+                ? meta.exp - Date.now() / 1000
+                : null
             };
           })
       );
@@ -36,11 +38,12 @@ async function onRequest({ request, env }) {
     }
     // GET /api/stats/:slug
     if (meth === 'GET' && /^api\/stats\/[a-z0-9]{6}$/i.test(path)) {
-      const slug = path.split('/').pop();
-      const creator = (await env.LINKS.getWithMetadata(slug)).metadata?.creator || null;
+      const slug    = path.split('/').pop();
+      const creator = (await env.LINKS.getWithMetadata(slug))
+                        .metadata?.creator || null;
       return json({
         clicks: parseInt(await env.STATS.get(slug) || '0', 10),
-        logs: safeJson(await env.LOGS.get('log:' + slug)).slice(0, 20),
+        logs:   safeJson(await env.LOGS.get('log:' + slug)).slice(0, 20),
         creator
       });
     }
@@ -64,16 +67,17 @@ async function onRequest({ request, env }) {
       if (!code || !longUrl || !/^https?:\/\//i.test(longUrl)) {
         return json({ error: 'bad payload' }, 400);
       }
+      // limpa dados antigos
       await Promise.all([
         env.STATS.delete(code),
         env.LOGS.delete('log:' + code),
         pruneDaily(env.STATS_DAY, code)
       ]);
-      const ttlSec = Math.min(Math.max(ttl ?? 0, 900), 2592000);
+      const ttlSec = Math.min(Math.max(ttl ?? 0, 900), 2_592_000);
       const meta = {
         created: Date.now(),
         creator: {
-          ip: request.headers.get('CF-Connecting-IP'),
+          ip:  request.headers.get('CF-Connecting-IP'),
           loc: request.cf?.country || '??'
         },
         exp: Date.now() / 1000 + ttlSec
@@ -92,6 +96,7 @@ async function onRequest({ request, env }) {
   if (meth === 'GET' && /^[a-z0-9]{6}$/i.test(path)) {
     const dest = await env.LINKS.get(path);
     if (!dest) {
+      // cleanup expirados
       await Promise.all([
         env.STATS.delete(path),
         env.LOGS.delete('log:' + path),
@@ -99,7 +104,7 @@ async function onRequest({ request, env }) {
       ]);
       return new Response('Not found', { status: 404 });
     }
-    // ... incrementar stats, logs, etc ...
+    // incrementar stats, logs, etc...
     return Response.redirect(dest, 302);
   }
 
@@ -108,13 +113,13 @@ async function onRequest({ request, env }) {
     return env.ASSETS.fetch(request);
   }
 
-  // ─────── Fallback para outros métodos ───────
+  // ─────── Fallback ───────
   return new Response('Method Not Allowed', { status: 405 });
 }
 
-// Export default para o Wrangler registrar o fetch handler
+// Exporta o handler para o Wrangler
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request, env) {
     return onRequest({ request, env });
   }
 };
@@ -135,6 +140,8 @@ const safeJson = t => {
 async function pruneDaily(ns, slug) {
   const { keys } = await ns.list({ prefix: '', limit: 1000 });
   await Promise.all(
-    keys.filter(k => k.name.endsWith(':' + slug)).map(k => ns.delete(k.name))
+    keys
+      .filter(k => k.name.endsWith(':' + slug))
+      .map(k => ns.delete(k.name))
   );
 }
