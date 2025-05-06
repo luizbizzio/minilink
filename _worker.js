@@ -23,8 +23,12 @@ async function pruneDaily(ns, slug) {
 }
 
 // Helper para servir arquivos estáticos via Worker Site binding ASSETS
-function fetchStatic(request, env) {
-  return env.ASSETS.fetch(request);
+function fetchStatic(pathOrRequest, request, env) {
+  // se vier string, transforme em Request só com o pathname
+  const req = typeof pathOrRequest === 'string'
+    ? new Request(pathOrRequest, request)
+    : pathOrRequest;
+  return env.ASSETS.fetch(req);
 }
 
 export default {
@@ -53,19 +57,17 @@ export default {
 
     // 4) Rota /admin serve public/admin/index.html
     if (method === 'GET' && (path === '/admin' || path === '/admin/')) {
-      const req = new Request(`${url.origin}/admin/index.html`, request);
-      return fetchStatic(req, env);
+      return env.ASSETS.fetch(new Request('/admin/index.html', request));
     }
 
     // 5) Rota raiz / serve public/index.html
     if (method === 'GET' && (path === '/' || path === '')) {
-      const req = new Request(`${url.origin}/index.html`, request);
-      return fetchStatic(req, env);
+      return env.ASSETS.fetch(new Request('/index.html', request));
     }
 
     // 6) Qualquer outro GET cai direto no static
     if (method === 'GET') {
-      return fetchStatic(request, env);
+      return env.ASSETS.fetch(request);
     }
 
     // 7) Outros métodos não permitidos
