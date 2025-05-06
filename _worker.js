@@ -1,25 +1,14 @@
 // _worker.js
 
-const cors = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Token'
-};
-
 const CENTROID = {
   US: [37, -95], BR: [-14, -52], FR: [46, 2],
   GB: [54, -2], DE: [51, 10], IN: [22, 79]
 };
 
-async function onRequest({ request, env, context }) {
+async function onRequest({ request, env }) {
   const url = new URL(request.url);
   const path = url.pathname.replace(/^\/+/, '');
   const meth = request.method;
-
-  // Preflight CORS
-  if (meth === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: cors });
-  }
 
   // ─────── ADMIN API ───────
   if (path.startsWith('api/')) {
@@ -57,11 +46,13 @@ async function onRequest({ request, env, context }) {
     }
     // GET /api/detail/:slug
     if (meth === 'GET' && /^api\/detail\/[a-z0-9]{6}$/i.test(path)) {
-      // detail logic here...
+      // ... seu código de detail aqui ...
+      return json({ /* ... */ });
     }
     // DELETE /api/delete/:slug
     if (meth === 'DELETE' && /^api\/delete\/[a-z0-9]{6}$/i.test(path)) {
-      // delete logic here...
+      // ... seu código de delete aqui ...
+      return json({ ok: true });
     }
     return json({ error: 'Not found' }, 404);
   }
@@ -87,7 +78,9 @@ async function onRequest({ request, env, context }) {
         },
         exp: Date.now() / 1000 + ttlSec
       };
-      const opts = ttlSec ? { expirationTtl: ttlSec, metadata: meta } : { metadata: meta };
+      const opts = ttlSec
+        ? { expirationTtl: ttlSec, metadata: meta }
+        : { metadata: meta };
       await env.LINKS.put(code, longUrl, opts);
       return json({ ok: true, code });
     } catch {
@@ -106,7 +99,7 @@ async function onRequest({ request, env, context }) {
       ]);
       return new Response('Not found', { status: 404 });
     }
-    // increment logic here...
+    // ... incrementar stats, logs, etc ...
     return Response.redirect(dest, 302);
   }
 
@@ -115,24 +108,28 @@ async function onRequest({ request, env, context }) {
     return env.ASSETS.fetch(request);
   }
 
-  // Fallback
+  // ─────── Fallback para outros métodos ───────
   return new Response('Method Not Allowed', { status: 405 });
 }
 
-// Helpers
+// Export default para o Wrangler registrar o fetch handler
+export default {
+  async fetch(request, env, ctx) {
+    return onRequest({ request, env });
+  }
+};
+
+// ────── Helpers ──────
+
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json', ...cors }
+    headers: { 'Content-Type': 'application/json' }
   });
 
 const safeJson = t => {
   if (!t || t === 'null') return [];
-  try {
-    return JSON.parse(t);
-  } catch {
-    return [];
-  }
+  try { return JSON.parse(t); } catch { return []; }
 };
 
 async function pruneDaily(ns, slug) {
@@ -141,9 +138,3 @@ async function pruneDaily(ns, slug) {
     keys.filter(k => k.name.endsWith(':' + slug)).map(k => ns.delete(k.name))
   );
 }
-
-export default {
-  async fetch(request, env, ctx) {
-    return onRequest({ request, env, context: ctx });
-  }
-};
