@@ -10,5 +10,4 @@ kv_namespaces = [
   { binding = "GEO",       id = "2a629d3120dc498fae067825c640343f" }
 ]
 
-[assets]
-directory = "./"
+site = { bucket = "./public" }
