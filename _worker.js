@@ -12,6 +12,7 @@ const json = (data, status = 200) =>
     headers: { 'Content-Type': 'application/json' }
   });
 
+// Remove chaves diárias antigas
 async function pruneDaily(ns, slug) {
   const { keys } = await ns.list({ prefix: '', limit: 1000 });
   await Promise.all(
@@ -21,11 +22,16 @@ async function pruneDaily(ns, slug) {
   );
 }
 
+// Helper para servir arquivos estáticos via Worker Site binding ASSETS
+function fetchStatic(request, env) {
+  return env.ASSETS.fetch(request);
+}
+
 export default {
   async fetch(request, env) {
-    const url   = new URL(request.url);
-    const path  = url.pathname;
-    const parts = path.replace(/^\/+|\/+$/g, '').split('/').filter(p=>p);
+    const url    = new URL(request.url);
+    const path   = url.pathname;
+    const parts  = path.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
     const method = request.method;
 
     // 1) API Admin (todas as rotas /api/...)
@@ -39,49 +45,35 @@ export default {
     }
 
     // 3) Redirect de slug (GET /<6 chars>)
-    if (
-      method === 'GET' &&
-      parts.length === 1 &&
-      /^[a-z0-9]{6}$/i.test(parts[0])
-    ) {
+    if (method === 'GET' &&
+        parts.length === 1 &&
+        /^[a-z0-9]{6}$/i.test(parts[0])) {
       return handleRedirect(request, env, parts[0]);
     }
 
     // 4) Rota /admin serve public/admin/index.html
     if (method === 'GET' && (path === '/admin' || path === '/admin/')) {
-      const base = new URL(request.url);
-      base.pathname = '/admin/index.html';
-      return fetchStatic(base.toString(), request, env);
+      const req = new Request(`${url.origin}/admin/index.html`, request);
+      return fetchStatic(req, env);
     }
 
     // 5) Rota raiz / serve public/index.html
     if (method === 'GET' && (path === '/' || path === '')) {
-      const base = new URL(request.url);
-      base.pathname = '/index.html';
-      return fetchStatic(base.toString(), request, env);
+      const req = new Request(`${url.origin}/index.html`, request);
+      return fetchStatic(req, env);
     }
 
-    // 6) Qualquer outro GET cai direto no static (CSS, JS, imagens, etc)
+    // 6) Qualquer outro GET cai direto no static
     if (method === 'GET') {
-      return fetchStatic(request.url, request, env);
+      return fetchStatic(request, env);
     }
 
-    // 7) Qualquer outro método: não permitido
+    // 7) Outros métodos não permitidos
     return new Response('Method Not Allowed', { status: 405 });
   }
 };
 
-// Função para buscar no binding correto
-function fetchStatic(url, request, env) {
-  // tenta ASSETS, se não existir, cai em __STATIC_CONTENT
-  const bucket = env.ASSETS ?? env.__STATIC_CONTENT;
-  if (!bucket || typeof bucket.fetch !== 'function') {
-    return new Response('Static binding not found', { status: 500 });
-  }
-  return bucket.fetch(new Request(url, request));
-}
-
-// Implementação de POST /
+// POST /
 async function handleCreate(request, env) {
   let body;
   try { body = await request.json(); }
@@ -92,6 +84,7 @@ async function handleCreate(request, env) {
     return json({ error: 'bad payload' }, 400);
   }
 
+  // limpa estatísticas antigas
   await Promise.all([
     env.STATS.delete(code),
     env.LOGS.delete('log:' + code),
@@ -107,7 +100,7 @@ async function handleCreate(request, env) {
   return json({ ok: true, code });
 }
 
-// Implementação de GET /<slug>
+// GET /<slug>
 async function handleRedirect(request, env, slug) {
   const dest = await env.LINKS.get(slug);
   if (!dest) {
@@ -119,7 +112,7 @@ async function handleRedirect(request, env, slug) {
     return new Response('Not found', { status: 404 });
   }
 
-  // incrementa tot e diário
+  // incrementa total e diário
   const total = parseInt(await env.STATS.get(slug) || '0', 10) + 1;
   env.STATS.put(slug, total.toString());
 
@@ -147,7 +140,7 @@ async function handleRedirect(request, env, slug) {
   return Response.redirect(dest, 302);
 }
 
-// Implementação de /api/...
+// /api/...
 async function handleApi(request, env, parts) {
   const token = request.headers.get('X-Admin-Token');
   if (token !== env.ADMIN_TOKEN) {
@@ -158,9 +151,10 @@ async function handleApi(request, env, parts) {
 
   // GET /api/list
   if (request.method === 'GET' && action === 'list') {
-    const keys = (await env.LINKS.list()).keys.filter(k=>/^[a-z0-9]{6}$/i.test(k.name));
-    const items = await Promise.all(keys.map(async k=>{
-      const { metadata = {} } = (await env.LINKS.getWithMetadata(k.name)) || {};
+    const keys = (await env.LINKS.list()).keys
+      .filter(k => /^[a-z0-9]{6}$/i.test(k.name));
+    const items = await Promise.all(keys.map(async k => {
+      const { metadata = {} } = await env.LINKS.getWithMetadata(k.name) || {};
       return {
         code: k.name,
         url: await env.LINKS.get(k.name),
@@ -180,8 +174,25 @@ async function handleApi(request, env, parts) {
 
   // GET /api/detail/:slug
   if (request.method === 'GET' && action === 'detail' && slug) {
-    // ... sua lógica de detail ...
-    return json({ /* ... */ });
+    const now = Date.now();
+    const total = parseInt(await env.STATS.get(slug) || '0', 10);
+    const byDay = {};
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(now - i * 864e5).toISOString().slice(0,10).replace(/-/g,'');
+      const n = parseInt(await env.STATS_DAY.get(`${d}:${slug}`) || '0', 10);
+      if (n) byDay[d] = n;
+    }
+    const rawLogs = JSON.parse(await env.LOGS.get('log:' + slug) || '[]');
+    const byHour = {};
+    const { metadata = {} } = await env.LINKS.getWithMetadata(slug) || {};
+    if (now - (metadata.created || now) < 864e5) {
+      rawLogs.forEach(l => {
+        const h = new Date(l.t).getHours().toString().padStart(2,'0');
+        byHour[h] = (byHour[h]||0) + 1;
+      });
+    }
+    const points = rawLogs.filter(l => l.lat != null).map(l => [l.lat, l.lon]);
+    return json({ total, byDay, byHour, points, logs: rawLogs.slice(0,100) });
   }
 
   // DELETE /api/delete/:slug
