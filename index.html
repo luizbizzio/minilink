@@ -122,7 +122,7 @@
   <script>feather.replace();</script>
 
   <script>
-    const API = '';
+    const API = 'https://url-shortener-backend.luizbizzio.workers.dev/';
 
     async function sha256(str){
       const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
@@ -137,9 +137,6 @@
       const ttl = parseInt(document.getElementById('ttl').value, 10);
       const code = await sha256(longUrl);
 
-
-
-        const API = 'https://seu-worker.workers.dev/';
         const res = await fetch(API, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
