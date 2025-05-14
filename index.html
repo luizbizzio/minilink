@@ -1,151 +1,159 @@
-<!DOCTYPE html><html lang="en"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Shortener Admin</title><meta name="robots" content="noindex">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/feather-icons@4.29.1/dist/feather.min.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://twemoji.maxcdn.com/v/latest/twemoji.min.js" defer></script>
-<style>
-/* -- (estilos iguais aos anteriores) -- */
-:root{--primary:#0066ff;--bg:#f2f5fa;--card:#fff;--text:#222;--radius:14px}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Inter,sans-serif;background:var(--bg);min-height:100vh;display:flex;justify-content:center;align-items:flex-start;padding:40px 12px}
-.card{width:100%;max-width:1000px;background:var(--card);border-radius:var(--radius);padding:32px 28px 40px;box-shadow:0 8px 24px rgba(0,0,0,.08)}
-h1{font-size:1.6rem;margin-bottom:24px;color:var(--text)}
-table{width:100%;border-collapse:collapse;font-size:14px}
-th,td{padding:10px 8px;border-bottom:1px solid #e5e9f0;text-align:left;vertical-align:top}
-th{background:#f0f4ff;font-weight:600}
-td a{color:var(--primary);text-decoration:none;cursor:pointer}
-.badge{padding:2px 6px;border-radius:4px;font-size:12px}
-.badge.red{background:#ffe5e5;color:#d40000}.badge.green{background:#e2fde2;color:#006b00}
-.logs{font-size:12.5px;color:#444;line-height:1.35}
-.icon-del{background:#ff5757;border:none;border-radius:6px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.2s}
-.icon-del:hover{background:#e14a4a}.icon-del i{color:#fff;width:16px;height:16px}
-td:last-child{width:60px;text-align:center}
-@media(max-width:680px){table,thead,tbody,tr,th,td{display:block}th{display:none}
- tr{margin-bottom:18px}td{border:none;padding:6px 4px}td:last-child{text-align:right}}
-#overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);align-items:center;justify-content:center;z-index:999}
-#modal{position:relative;background:#fff;border-radius:16px;max-width:920px;width:95%;padding:24px;box-shadow:0 10px 28px rgba(0,0,0,.15)}
-#chart{max-width:880px;height:260px;margin-bottom:24px}
-#map{width:100%;max-width:880px;height:400px;border-radius:14px;box-shadow:0 4px 18px rgba(0,0,0,.1)}
-.close{position:absolute;top:10px;right:16px;font-size:28px;cursor:pointer;border:none;background:none;color:#777}
-.close:hover{color:#000}
-</style>
-</head><body>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cloudflare URL Shortener</title>
 
-<div class="card" id="app">
-  <h1>Admin Login</h1>
-  <form onsubmit="login(event)">
-    <input id="tok" type="password" placeholder="Admin token" style="width:260px">
-    <label style="display:block;margin:6px 0 12px">
-      <input type="checkbox" id="remember"> Remember me
-    </label>
-    <button type="submit">Enter</button>
-  </form>
-</div>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/feather-icons@4.29.1/dist/feather.min.css">
 
-<!-- modal -->
-<div id="overlay"><div id="modal">
-  <button class="close" onclick="closeModal()" aria-label="close">&times;</button>
-  <h2 id="mTitle"></h2><canvas id="chart"></canvas><div id="map"></div>
-</div></div>
+  <style>
+    :root {
+      --primary:#0066ff;
+      --bg:#f2f5fa;
+      --card:#ffffff;
+      --text:#222;
+      --radius:14px;
+    }
+    *{box-sizing:border-box;}
+    body{
+      margin:0;
+      font-family:Inter,system-ui,sans-serif;
+      background:var(--bg);
+      display:flex;
+      min-height:100vh;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+    }
+    .card{
+      width:100%;
+      max-width:420px;
+      background:var(--card);
+      border-radius:var(--radius);
+      box-shadow:0 8px 24px rgba(0,0,0,.08);
+      padding:32px 28px 40px;
+      text-align:center;
+    }
+    h1{
+      margin:0 0 24px;
+      font-weight:600;
+      color:var(--text);
+      font-size:1.6rem;
+    }
+    input,select,button{
+      width:100%;
+      padding:12px 14px;
+      font-size:15px;
+      border-radius:8px;
+      border:1px solid #ccd4e0;
+      margin-top:12px;
+      font-family:inherit;
+    }
+    button{
+      background:var(--primary);
+      color:#fff;
+      border:none;
+      cursor:pointer;
+      transition:background .2s;
+    }
+    button:hover{background:#0056da;}
+    #result{
+      margin-top:28px;
+      word-break:break-all;
+      line-height:1.4;
+    }
+    #result a{
+      color:var(--primary);
+      text-decoration:none;
+      word-break:break-all;
+    }
+    .topbar{
+      position:fixed;
+      top:18px;right:18px;
+    }
+    .icon-btn{
+      width:44px;height:44px;
+      border-radius:50%;
+      background:var(--card);
+      box-shadow:0 4px 12px rgba(0,0,0,.08);
+      border:none;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      transition:background .2s;
+    }
+    .icon-btn:hover{background:#e8eef8;}
+    .icon-btn i{width:20px;height:20px;color:var(--text);}
+    @media(max-width:480px){
+      .card{padding:24px 20px 32px;}
+    }
+  </style>
+</head>
+<body>
 
-<script src="https://cdn.jsdelivr.net/npm/feather-icons@4.29.1/dist/feather.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/leaflet.heat/dist/leaflet-heat.js"></script>
+  <div class="topbar">
+    <a class="icon-btn" href="admin" title="Admin panel">
+      <i data-feather="lock"></i>
+    </a>
+  </div>
 
-<script>
-const ENDPOINT='https://url-shortener.luizbizzio.workers.dev';
-let TOKEN=localStorage.getItem('admin_token')||'';
-if(TOKEN) loadList();
+  <div class="card">
+    <h1>URL Shortener</h1>
 
-/* ---------- LOGIN ---------- */
-function login(ev){
-  ev.preventDefault();                        // evita refresh
-  TOKEN=document.getElementById('tok').value.trim();
-  if(!TOKEN) return;
-  if(document.getElementById('remember').checked) localStorage.setItem('admin_token',TOKEN);
-  loadList();
-}
+    <input id="long" placeholder="https://example.com/very/long/link" />
 
-/* ---------- UTIL HTML ---------- */
-const flag = cc => cc&&cc.length===2 ? `<img src="https://flagcdn.com/24x18/${cc.toLowerCase()}.png" width="24" height="18" style="vertical-align:-3px">` : '';
-const badge = s => {
-  if(s<=0) return'<span class="badge red">expired</span>';
-  const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);
-  return `<span class="badge green">${d?d+'d ':''}${h?h+'h ':''}${m?m+'m':''}</span>`;
-};
-const logsHtml = a => !a||!a.length ? '<small>—</small>' :
-  a.slice(0,3).map(l=>`<div class="logs">${flag(l.loc)} ${l.loc} ${l.ip}<br>${new Date(l.t).toLocaleString()}</div>`).join('');
+    <select id="ttl">
+      <option value="900">15 minutes</option>
+      <option value="3600">1 hour</option>
+      <option value="86400">1 day</option>
+      <option value="604800">1 week</option>
+      <option value="2592000">1 month</option>
+    </select>
 
-/* ---------- LISTA PRINCIPAL ---------- */
-async function loadList(){
-  app.innerHTML='<h1 style="margin-bottom:0">Loading…</h1>';
-  const res = await fetch(`${ENDPOINT}/api/list`,{headers:{'X-Admin-Token':TOKEN}});
-  if(!res.ok){app.innerHTML='<h1>Invalid token</h1>';return;}
-  const list = await res.json();
-  renderTable(list);
-}
+    <button id="go">Shorten Link</button>
 
-async function renderTable(list){
-  let rows='';
-  for(const o of list){
-    const stats = await fetch(`${ENDPOINT}/api/stats/${o.code}`,{headers:{'X-Admin-Token':TOKEN}}).then(r=>r.json());
-    rows+=`<tr>
-      <td><a onclick="openDetail('${o.code}')">${o.code}</a></td>
-      <td><a href="${o.url}" target="_blank">${o.url||'-'}</a></td>
-      <td>${stats.clicks||0}</td>
-      <td>${o.expiresIn!=null?badge(o.expiresIn):'∞'}</td>
-      <td>${o.created?new Date(o.created).toLocaleString(): '-'}<br>
-          ${o.creator?flag(o.creator.loc)+' '+o.creator.loc+' '+o.creator.ip:''}</td>
-      <td>${logsHtml(stats.logs)}</td>
-      <td><button class="icon-del" onclick="del('${o.code}')"><i data-feather="trash-2"></i></button></td>
-    </tr>`;
-  }
-  app.innerHTML=`<h1>All Links</h1><table><thead><tr>
-    <th>Slug</th><th>Destination</th><th>Clicks</th><th>Expires</th><th>Created</th><th>Last hits</th><th></th>
-  </tr></thead><tbody>${rows}</tbody></table>`;
-  feather.replace(); twemoji.parse(app);
-}
+    <div id="result"></div>
+  </div>
 
-/* ---------- POPUP DETAIL ---------- */
-async function openDetail(slug){
-  overlay.style.display='flex'; mTitle.textContent='Stats – '+slug;
-  const data=await fetch(`${ENDPOINT}/api/detail/${slug}`,{headers:{'X-Admin-Token':TOKEN}}).then(r=>r.json());
+  <script src="https://cdn.jsdelivr.net/npm/feather-icons@4.29.1/dist/feather.min.js"></script>
+  <script>feather.replace();</script>
 
-  /* gráfico */
-  chart.replaceWith(chart.cloneNode(true)); const ctx=document.getElementById('chart');
-  const useHour=Object.keys(data.byHour||{}).length;
-  const labels=(useHour?Object.keys(data.byHour):Object.keys(data.byDay)).sort();
-  const values=labels.map(l=>useHour?data.byHour[l]:data.byDay[l]);
-  new Chart(ctx,{type:'line',
-    data:{labels:useHour?labels.map(h=>h+':00'):labels.map(d=>`${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6)}`),
-          datasets:[{data:values,fill:false,tension:0.3}]},
-    options:{responsive:true,plugins:{legend:{display:false},
-      tooltip:{callbacks:{
-        label:c=>`Clicks: ${c.formattedValue}`,
-        afterLabel:c=>{
-          const key=useHour?c.label.split(':')[0]:
-                           c.label.replace(/-/g,'');
-          const hits=data.logs.filter(l=>{
-            const d=new Date(l.t);
-            return useHour?d.getHours()==key:Number(d.toISOString().slice(0,10).replace(/-/g,''))==key;
-          });
-          return hits.map(l=>`${flag(l.loc)} ${l.ip}`);
-        }}}}}
-  });
+  <script>
+    const API = '';
 
-  /* mapa */
-  map.replaceWith(map.cloneNode(true)); const m=L.map('map',{worldCopyJump:true}).setView([20,0],2);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(m);
-  if(data.points.length){
-    L.heatLayer(data.points.map(p=>[p[0],p[1],0.6]),{radius:25}).addTo(m);
-    data.points.forEach(p=>L.circleMarker(p,{radius:5,fillOpacity:0.8,color:'#ff5722'}).addTo(m));
-  }
-}
+    async function sha256(str){
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+      return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,6);
+    }
 
-function closeModal(){overlay.style.display='none';}
-async function del(code){if(confirm('Delete '+code+' ?')){await fetch(`${ENDPOINT}/api/delete/${code}`,{method:'DELETE',headers:{'X-Admin-Token':TOKEN}});loadList();}}
-</script>
-</body></html>
+    async function shorten(){
+      const longUrl = document.getElementById('long').value.trim();
+      if(!/^https?:\/\//i.test(longUrl)){
+        alert('Enter a valid URL (http/https).'); return;
+      }
+      const ttl = parseInt(document.getElementById('ttl').value, 10);
+      const code = await sha256(longUrl);
+
+      const res = await fetch('/', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({code, url:longUrl, ttl})
+      });
+
+      if(res.ok){
+        const short = `${location.origin}/${code}`;
+        document.getElementById('result').innerHTML =
+          `<strong>Short URL:</strong><br><a href="${short}" target="_blank">${short}</a>`;
+      }else{
+        const msg = await res.text();
+        alert('Error: '+msg);
+      }
+    }
+
+    document.getElementById('go').addEventListener('click', shorten);
+  </script>
+</body>
+</html>
