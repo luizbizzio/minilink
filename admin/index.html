@@ -53,7 +53,7 @@ td:last-child{width:60px;text-align:center}
 <script src="https://cdn.jsdelivr.net/npm/leaflet.heat/dist/leaflet-heat.js"></script>
 
 <script>
-const ENDPOINT='';
+const API='https://url-shortener-backend.luizbizzio.workers.dev';
 let TOKEN=localStorage.getItem('admin_token')||'';
 if(TOKEN) loadList();
 
@@ -76,7 +76,7 @@ const logsHtml = a => !a||!a.length ? '<small>—</small>' :
 
 async function loadList(){
   app.innerHTML='<h1 style="margin-bottom:0">Loading…</h1>';
-  const res = await fetch(`${ENDPOINT}/api/list`,{headers:{'X-Admin-Token':TOKEN}});
+  const res = await fetch(`${API}/api/list`,{headers:{'X-Admin-Token':TOKEN}});
   if(!res.ok){app.innerHTML='<h1>Invalid token</h1>';return;}
   const list = await res.json();
   renderTable(list);
@@ -85,7 +85,7 @@ async function loadList(){
 async function renderTable(list){
   let rows='';
   for(const o of list){
-    const stats = await fetch(`${ENDPOINT}/api/stats/${o.code}`,{headers:{'X-Admin-Token':TOKEN}}).then(r=>r.json());
+    const stats = await fetch(`${API}/api/stats/${o.code}`,{headers:{'X-Admin-Token':TOKEN}}).then(r=>r.json());
     rows+=`<tr>
       <td><a onclick="openDetail('${o.code}')">${o.code}</a></td>
       <td><a href="${o.url}" target="_blank">${o.url||'-'}</a></td>
@@ -105,7 +105,7 @@ async function renderTable(list){
 
 async function openDetail(slug){
   overlay.style.display='flex'; mTitle.textContent='Stats – '+slug;
-  const data=await fetch(`${ENDPOINT}/api/detail/${slug}`,{headers:{'X-Admin-Token':TOKEN}}).then(r=>r.json());
+  const data=await fetch(`${API}/api/detail/${slug}`,{headers:{'X-Admin-Token':TOKEN}}).then(r=>r.json());
 
   chart.replaceWith(chart.cloneNode(true)); const ctx=document.getElementById('chart');
   const useHour=Object.keys(data.byHour||{}).length;
@@ -137,6 +137,6 @@ async function openDetail(slug){
 }
 
 function closeModal(){overlay.style.display='none';}
-async function del(code){if(confirm('Delete '+code+' ?')){await fetch(`${ENDPOINT}/api/delete/${code}`,{method:'DELETE',headers:{'X-Admin-Token':TOKEN}});loadList();}}
+async function del(code){if(confirm('Delete '+code+' ?')){await fetch(`${API}/api/delete/${code}`,{method:'DELETE',headers:{'X-Admin-Token':TOKEN}});loadList();}}
 </script>
 </body></html>
