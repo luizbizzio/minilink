@@ -137,11 +137,14 @@
       const ttl = parseInt(document.getElementById('ttl').value, 10);
       const code = await sha256(longUrl);
 
-      const res = await fetch('/', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({code, url:longUrl, ttl})
-      });
+
+
+        const API = 'https://seu-worker.workers.dev/';
+        const res = await fetch(API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, url: longUrl, ttl })
+        });
 
       if(res.ok){
         const short = `${location.origin}/${code}`;
