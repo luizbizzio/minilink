@@ -5,8 +5,7 @@ export async function onRequest(context) {
   if (
     path === '/' ||
     path === '/admin' ||
-    path.startsWith('/admin/') ||
-    path.startsWith('/api/')
+    path.startsWith('/admin/')
   ) {
     return await next();
   }
