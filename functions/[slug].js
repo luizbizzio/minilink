@@ -1,65 +1,48 @@
 // functions/[slug].js
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*'
-};
-
-export async function onRequestGet({ request, params, env }) {
-  const url  = new URL(request.url);
-  const path = url.pathname;       // ex: "/admin", "/admin/app.js", "/99f934"
-  const slug = params.slug;        // só o segmento após a "/" 
-
-  // ── 1) Se for /admin ou /admin/qualquer-coisa, serve estático ──
-  if (path === '/admin' || path.startsWith('/admin/')) {
-    return fetch(request);
-  }
-
-  // ── 2) Agora sim, valida slug de 6 chars ──
+export async function onRequestGet({ params, env }) {
+  const slug = params.slug;    
+  // 1) Só aceita slugs de 6 caracteres alfanuméricos
   if (!/^[a-z0-9]{6}$/i.test(slug)) {
-    return new Response('Not found', {
-      status: 404,
-      headers: CORS
-    });
+    return new Response('Not found', { status: 404 });
   }
 
-  // ── 3) Busca destino no KV ──
+  // 2) Busca destino no KV
   const dest = await env.LINKS.get(slug);
   if (!dest) {
-    // (opcional) limpa estatísticas órfãs
+    // opcional: limpeza de estatísticas órfãs
     await Promise.all([
       env.STATS.delete(slug),
       env.LOGS.delete('log:' + slug),
       pruneDaily(env.STATS_DAY, slug)
     ]);
-    return new Response('Not found', {
-      status: 404,
-      headers: CORS
-    });
+    return new Response('Not found', { status: 404 });
   }
 
-  // ── 4) Atualiza contadores ──
-  const tot = parseInt(await env.STATS.get(slug) || '0', 10) + 1;
-  env.STATS.put(slug, tot.toString());
+  // 3) Incrementa contador total
+  const total = (parseInt(await env.STATS.get(slug) || '0', 10) + 1).toString();
+  env.STATS.put(slug, total);
 
-  const today    = new Date().toISOString().slice(0,10).replace(/-/g,'');
-  const dailyKey = `${today}:${slug}`;
-  const daily    = parseInt(await env.STATS_DAY.get(dailyKey) || '0', 10) + 1;
-  env.STATS_DAY.put(dailyKey, daily.toString());
+  // 4) Incrementa estatística diária
+  const todayKey = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const dailyKey = `${todayKey}:${slug}`;
+  const daily = (parseInt(await env.STATS_DAY.get(dailyKey) || '0', 10) + 1).toString();
+  env.STATS_DAY.put(dailyKey, daily);
 
-  // ── 5) (Opcional) Log de localização ──
-  const ip  = request.headers.get('CF-Connecting-IP');
-  const loc = request.cf?.country || '??';
+  // 5) (Opcional) Log de localização
+  const ip  = env.CF ? env.CF.connecting_ip : null; // ou use request.headers
+  const loc = env.CF ? env.CF.country : '??';
   const raw = await env.LOGS.get('log:' + slug) || '[]';
   const arr = JSON.parse(raw);
   arr.unshift({ t: Date.now(), ip, loc });
   arr.length = Math.min(arr.length, 300);
   await env.LOGS.put('log:' + slug, JSON.stringify(arr));
 
-  // ── 6) Redireciona de verdade ──
+  // 6) Redireciona de verdade
   return Response.redirect(dest, 302);
 }
 
-// Helper para limpar chaves diárias
+// Helper para limpeza diária
 async function pruneDaily(ns, slug) {
   const { keys } = await ns.list({ prefix: '', limit: 1000 });
   await Promise.all(
