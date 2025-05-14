@@ -1,19 +1,9 @@
 export async function onRequest({ request, next }) {
-  const url  = new URL(request.url);
-  const path = url.pathname;
-
-  if (path === '/admin') {
-    url.pathname = '/admin/';
-    return Response.redirect(url.toString(), 308);
+  // let static handle "/", "/admin/" and anything under "/admin/"
+  const p = new URL(request.url).pathname;
+  if (p === '/' || p.startsWith('/admin/')) {
+    return next();
   }
-
-  if (
-    path === '/' ||
-    path.startsWith('/admin/') ||
-    path.startsWith('/api/')
-  ) {
-    return await next();
-  }
-
-  return await next();
+  // otherwise, fall back to the slug handler
+  return next();
 }
