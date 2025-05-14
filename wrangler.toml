@@ -1,0 +1,10 @@
+name = "url-shortener-pages"
+type = "javascript"
+
+[build]
+command = ""
+upload_format = "service-worker"
+upload = { bucket = "./public" }
+
+[functions]
+directory = "./functions"
