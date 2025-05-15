@@ -80,6 +80,7 @@ export async function onRequest(context) {
           const created   = metadata.created || 0;
           const exp       = metadata.exp || 0;
           const expiresIn = Math.floor(exp - Date.now()/1000);
+          const expired   = expiresIn <= 0;
 
           const clicks = parseInt(await env.STATS.get(code) || '0', 10);
           const rawLogs = JSON.parse(await env.LOGS.get('log:' + code) || '[]');
@@ -92,6 +93,7 @@ export async function onRequest(context) {
             created,
             creator:   metadata.creator || null,
             expiresIn,
+            expired,
             logs
           };
         })
@@ -181,8 +183,8 @@ export async function onRequest(context) {
     }
     const nowSec = Date.now() / 1000;
     if (metadata.exp && nowSec > metadata.exp) {
-      // expired: do not delete
-      return new Response('Not found', { status: 404 });
+      // expired: do not delete, just signal
+      return new Response('Link expired', { status: 410 });
     }
 
     // increment total clicks
