@@ -34,25 +34,25 @@ export async function onRequest(context) {
     return await next();
   }
 
-  // 4) Create new short link: POST "/"
-  if (method === 'POST' && path === '/') {
-    try {
-      const { code, url: longUrl, ttl } = await request.json();
-      if (!code || !/^https?:\/\//i.test(longUrl)) {
-        return json({ error: 'bad payload' }, 400);
-      }
+// 4) Create new short link: POST "/"
+if (method === 'POST' && path === '/') {
+  const { code, url: longUrl, ttl } = await request.json();
+  // validações…
+  const ttlSec = Math.min(Math.max(ttl || 0, 900), 2_592_000);
+  const exp    = Date.now()/1000 + ttlSec;
+  const meta   = {
+    created: Date.now(),
+    exp,
+    creator: {
+      ip:  request.headers.get('CF-Connecting-IP'),
+      loc: request.cf?.country || '??'
+    }
+  };
 
-      // Compute expiration metadata, but do NOT clear stats/logs here
-      const ttlSec = Math.min(Math.max(ttl || 0, 900), 2_592_000);
-      const exp    = Date.now() / 1000 + ttlSec;
-      const meta   = {
-        created: Date.now(),
-        exp,
-        creator: {
-          ip:  request.headers.get('CF-Connecting-IP'),
-          loc: request.cf?.country || '??'
-        }
-      };
+  // **sem** expirationTtl — só metadata
+  await env.LINKS.put(code, longUrl, { metadata: meta });
+  return json({ ok: true, code });
+}
 
       // Store without expirationTtl so that we keep stats/logs
       await env.LINKS.put(code, longUrl, { metadata: meta });
@@ -156,18 +156,18 @@ export async function onRequest(context) {
     return json({ ok: true });
   }
 
-  // 9) Redirect slug: GET "/XXXXXX" with expiration check
-  if (method === 'GET' && /^\/[a-z0-9]{6}$/i.test(path)) {
-    const slug = path.slice(1);
-    const { value: dest, metadata = {} } = await env.LINKS.getWithMetadata(slug) || {};
-    if (!dest) {
-      return new Response('Not found', { status: 404 });
-    }
-    const nowSec = Date.now() / 1000;
-    if (metadata.exp && nowSec > metadata.exp) {
-      // expired: do not delete, just 404
-      return new Response('Not found', { status: 404 });
-    }
+// 9) Redirect slug: GET "/XXXXXX"
+if (method === 'GET' && /^\/[a-z0-9]{6}$/i.test(path)) {
+  const slug = path.slice(1);
+  const { value: dest, metadata = {} } = await env.LINKS.getWithMetadata(slug) || {};
+
+  if (!dest) return new Response('Not found', { status: 404 });
+
+  // se expirado, retorna 404 mas NÃO apaga do KV
+  const now = Date.now()/1000;
+  if (metadata.exp && now > metadata.exp) {
+    return new Response('Not found', { status: 404 });
+  }
 
     // increment total clicks
     const total = parseInt(await env.STATS.get(slug) || '0', 10) + 1;
