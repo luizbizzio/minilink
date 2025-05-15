@@ -23,47 +23,47 @@ export async function onRequest(context) {
     return new Response(null, { status: 204, headers: cors });
   }
 
-  // 2) Redirect "/admin" → "/admin/" so Pages will serve admin/index.html
+  // 2) Redirect "/admin" → "/admin/"
   if (path === '/admin') {
     url.pathname = '/admin/';
     return Response.redirect(url.toString(), 308);
   }
 
-  // 3) Serve static HTML for "/" and anything under "/admin/"
+  // 3) Serve static for "/" and "/admin/*"
   if (path === '/' || path.startsWith('/admin/')) {
     return await next();
   }
 
-// 4) Create new short link: POST "/"
-if (method === 'POST' && path === '/') {
-  const { code, url: longUrl, ttl } = await request.json();
-  // validações…
-  const ttlSec = Math.min(Math.max(ttl || 0, 900), 2_592_000);
-  const exp    = Date.now()/1000 + ttlSec;
-  const meta   = {
-    created: Date.now(),
-    exp,
-    creator: {
-      ip:  request.headers.get('CF-Connecting-IP'),
-      loc: request.cf?.country || '??'
-    }
-  };
+  // 4) Create new short link: POST "/"
+  if (method === 'POST' && path === '/') {
+    try {
+      const { code, url: longUrl, ttl } = await request.json();
+      if (!code || !/^https?:\/\//i.test(longUrl)) {
+        return json({ error: 'bad payload' }, 400);
+      }
 
-  // **sem** expirationTtl — só metadata
-  await env.LINKS.put(code, longUrl, { metadata: meta });
-  return json({ ok: true, code });
-}
+      // Compute expiration metadata, but do NOT clear stats/logs here
+      const ttlSec = Math.min(Math.max(ttl || 0, 900), 2_592_000);
+      const exp    = Date.now() / 1000 + ttlSec;
+      const meta   = {
+        created: Date.now(),
+        exp,
+        creator: {
+          ip:  request.headers.get('CF-Connecting-IP'),
+          loc: request.cf?.country || '??'
+        }
+      };
 
       // Store without expirationTtl so that we keep stats/logs
       await env.LINKS.put(code, longUrl, { metadata: meta });
       return json({ ok: true, code });
 
-    } catch {
+    } catch (e) {
       return json({ error: 'invalid json' }, 400);
     }
   }
 
-  // 5) Admin API: GET "/api/list" — includes total clicks + last 3 hits + expiresIn
+  // 5) Admin API: GET "/api/list"
   if (method === 'GET' && path === '/api/list') {
     const token = request.headers.get('X-Admin-Token');
     if (token !== env.ADMIN_TOKEN) {
@@ -119,16 +119,25 @@ if (method === 'POST' && path === '/') {
     }
     const slug        = path.split('/').pop();
     const clicksTotal = parseInt(await env.STATS.get(slug) || '0', 10);
-    const now         = Date.now();
-    const byDay       = {};
+
+    // last 30 days byDay
+    const byDay = {};
+    const now   = Date.now();
     for (let i = 0; i < 30; i++) {
-      const d = new Date(now - i * 864e5)
+      const dayId = new Date(now - i * 864e5)
         .toISOString().slice(0, 10).replace(/-/g, '');
-      const n = parseInt(await env.STATS_DAY.get(`${d}:${slug}`) || '0', 10);
-      if (n) byDay[d] = n;
+      const count = parseInt(await env.STATS_DAY.get(`${dayId}:${slug}`) || '0', 10);
+      if (count) byDay[dayId] = count;
     }
+
+    // raw logs
     const rawLogs = JSON.parse(await env.LOGS.get('log:' + slug) || '[]');
-    const points  = rawLogs.filter(l => l.lat != null).map(l => [l.lat, l.lon]);
+    // heatmap points
+    const points = rawLogs
+      .filter(l => l.lat != null && l.lon != null)
+      .map(l => [l.lat, l.lon]);
+
+    // byHour if created today
     const byHour  = {};
     const created = (await env.LINKS.getWithMetadata(slug)).metadata?.created || now;
     if (now - created < 864e5) {
@@ -137,7 +146,14 @@ if (method === 'POST' && path === '/') {
         byHour[h] = (byHour[h] || 0) + 1;
       });
     }
-    return json({ clicksTotal, byDay, byHour, points, logs: rawLogs.slice(0, 100) });
+
+    return json({
+      clicksTotal,
+      byDay,
+      byHour,
+      points,
+      logs: rawLogs.slice(0, 100)
+    });
   }
 
   // 8) Admin API: DELETE "/api/delete/:slug"
@@ -156,18 +172,18 @@ if (method === 'POST' && path === '/') {
     return json({ ok: true });
   }
 
-// 9) Redirect slug: GET "/XXXXXX"
-if (method === 'GET' && /^\/[a-z0-9]{6}$/i.test(path)) {
-  const slug = path.slice(1);
-  const { value: dest, metadata = {} } = await env.LINKS.getWithMetadata(slug) || {};
-
-  if (!dest) return new Response('Not found', { status: 404 });
-
-  // se expirado, retorna 404 mas NÃO apaga do KV
-  const now = Date.now()/1000;
-  if (metadata.exp && now > metadata.exp) {
-    return new Response('Not found', { status: 404 });
-  }
+  // 9) Redirect slug: GET "/XXXXXX"
+  if (method === 'GET' && /^\/[a-z0-9]{6}$/i.test(path)) {
+    const slug = path.slice(1);
+    const { value: dest, metadata = {} } = await env.LINKS.getWithMetadata(slug) || {};
+    if (!dest) {
+      return new Response('Not found', { status: 404 });
+    }
+    const nowSec = Date.now() / 1000;
+    if (metadata.exp && nowSec > metadata.exp) {
+      // expired: do not delete
+      return new Response('Not found', { status: 404 });
+    }
 
     // increment total clicks
     const total = parseInt(await env.STATS.get(slug) || '0', 10) + 1;
@@ -178,7 +194,7 @@ if (method === 'GET' && /^\/[a-z0-9]{6}$/i.test(path)) {
     const daily  = parseInt(await env.STATS_DAY.get(dayKey) || '0', 10) + 1;
     await env.STATS_DAY.put(dayKey, daily.toString());
 
-    // capture IP/country and lat/lon (with GEO fallback)
+    // log with geo fallback
     const ip  = request.headers.get('CF-Connecting-IP');
     const loc = request.cf?.country || '??';
     let lat = request.cf?.latitude ?? null;
@@ -202,7 +218,7 @@ if (method === 'GET' && /^\/[a-z0-9]{6}$/i.test(path)) {
   return new Response('Not found', { status: 404 });
 }
 
-// Helper to prune old daily keys
+// Helper to prune daily keys
 async function pruneDaily(ns, slug) {
   const { keys } = await ns.list({ prefix: '', limit: 1000 });
   await Promise.all(
