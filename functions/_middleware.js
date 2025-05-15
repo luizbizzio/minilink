@@ -160,7 +160,7 @@ export async function onRequest(context) {
   }
 
   // 9) Redirect slug: GET "/XXXXXX"
-  if (method === 'GET' && /^\/[a-z0-9]{6}$/i.test(path.slice(1))) {
+  if (method === 'GET' && /^\/[a-z0-9]{6}$/i.test(path)) {
     const slug = path.slice(1);
     const dest = await env.LINKS.get(slug);
     if (!dest) {
