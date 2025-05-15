@@ -67,7 +67,7 @@ export async function onRequest(context) {
     }
   }
 
-  // 5) Admin API: GET "/api/list" — now includes last hits
+  // 5) Admin API: GET "/api/list" — includes last 3 hits
   if (method === 'GET' && path === '/api/list') {
     const token = request.headers.get('X-Admin-Token');
     if (token !== env.ADMIN_TOKEN) {
@@ -92,7 +92,7 @@ export async function onRequest(context) {
             created:   meta.created   || 0,
             creator:   meta.creator   || null,
             expiresIn: meta.exp ? meta.exp - Date.now() / 1000 : null,
-            logs    // <— include the last hits here
+            logs
           };
         })
     );
@@ -128,8 +128,7 @@ export async function onRequest(context) {
       if (n) byDay[d] = n;
     }
     const rawLogs = JSON.parse(await env.LOGS.get('log:' + slug) || '[]');
-    const points  = rawLogs.filter(l => l.lat != null)
-                           .map(l => [l.lat, l.lon]);
+    const points  = rawLogs.filter(l => l.lat != null).map(l => [l.lat, l.lon]);
     const byHour  = {};
     const created = (await env.LINKS.getWithMetadata(slug))
                       .metadata?.created || now;
@@ -158,7 +157,7 @@ export async function onRequest(context) {
     return json({ ok: true });
   }
 
-  // 9) Redirect slug: GET "/XXXXXX"
+  // 9) Redirect slug: GET "/XXXXXX" with GEO fallback
   if (method === 'GET' && /^\/[a-z0-9]{6}$/i.test(path)) {
     const slug = path.slice(1);
     const dest = await env.LINKS.get(slug);
@@ -170,7 +169,8 @@ export async function onRequest(context) {
       ]);
       return new Response('Not found', { status: 404 });
     }
-    // update stats
+
+    // update stats (fire-and-forget)
     env.STATS.put(
       slug,
       (parseInt(await env.STATS.get(slug) || '0', 10) + 1).toString()
@@ -180,14 +180,31 @@ export async function onRequest(context) {
       dayKey,
       (parseInt(await env.STATS_DAY.get(dayKey) || '0', 10) + 1).toString()
     );
+
+    // capture IP and country
     const ip  = request.headers.get('CF-Connecting-IP');
     const loc = request.cf?.country || '??';
+
+    // attempt direct lat/lon, else fallback to GEO KV
+    let lat = request.cf?.latitude ?? null;
+    let lon = request.cf?.longitude ?? null;
+    if (lat == null || lon == null) {
+      const geo = await env.GEO.get(loc);
+      if (geo) {
+        try {
+          [lat, lon] = JSON.parse(geo);
+        } catch {}
+      }
+    }
+
+    // build and store the log entry
     const raw = await env.LOGS.get('log:' + slug) || '[]';
     const arr = JSON.parse(raw);
-    arr.unshift({ t: Date.now(), ip, loc });
+    arr.unshift({ t: Date.now(), ip, loc, lat, lon });
     arr.length = Math.min(arr.length, 300);
     env.LOGS.put('log:' + slug, JSON.stringify(arr));
 
+    // perform the redirect
     return Response.redirect(dest, 302);
   }
 
@@ -199,7 +216,8 @@ export async function onRequest(context) {
 async function pruneDaily(ns, slug) {
   const { keys } = await ns.list({ prefix: '', limit: 1000 });
   await Promise.all(
-    keys.filter(k => k.name.endsWith(':' + slug))
-        .map(k => ns.delete(k.name))
+    keys
+      .filter(k => k.name.endsWith(':' + slug))
+      .map(k => ns.delete(k.name))
   );
 }
