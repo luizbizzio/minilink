@@ -18,37 +18,36 @@ export async function onRequest(context) {
       headers: { 'Content-Type': 'application/json', ...cors }
     });
 
-  // 1) Preflight
+  // 1) OPTIONS preflight
   if (method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: cors });
   }
 
-  // 2) /admin → /admin/
+  // 2) Redirect /admin → /admin/
   if (path === '/admin') {
     url.pathname = '/admin/';
     return Response.redirect(url.toString(), 308);
   }
 
-  // 3) static "/" e "/admin/*"
+  // 3) Serve static for "/" and "/admin/*"
   if (path === '/' || path.startsWith('/admin/')) {
     return await next();
   }
 
-  // 4) Criar link
+  // 4) POST "/" → create link
   if (method === 'POST' && path === '/') {
     try {
       const { code, url: longUrl, ttl } = await request.json();
       if (!code || !/^https?:\/\//i.test(longUrl)) {
         return json({ error: 'bad payload' }, 400);
       }
-      // limpa estatísticas antigas (se houver)
+      // cleanup old stats/logs
       await Promise.all([
         env.STATS.delete(code),
         env.LOGS.delete('log:' + code),
         pruneDaily(env.STATS_DAY, code)
       ]);
-
-      // TTL entre 900s e 2.592.000s
+      // compute expiration
       const ttlSec = Math.min(Math.max(ttl || 0, 900), 2_592_000);
       const exp    = Date.now()/1000 + ttlSec;
       const meta   = {
@@ -59,8 +58,7 @@ export async function onRequest(context) {
           loc: request.cf?.country || '??'
         }
       };
-
-      // grava SEM expirationTtl
+      // store WITHOUT expirationTtl
       await env.LINKS.put(code, longUrl, { metadata: meta });
       return json({ ok: true, code });
     } catch {
@@ -68,12 +66,11 @@ export async function onRequest(context) {
     }
   }
 
-  // 5) GET /api/list — inclui clicks + last 3 hits + expiresIn
+  // 5) GET "/api/list" → list all with clicks, logs, expiresIn
   if (method === 'GET' && path === '/api/list') {
     const token = request.headers.get('X-Admin-Token');
-    if (token !== env.ADMIN_TOKEN) {
-      return new Response('Forbidden', { status: 403 });
-    }
+    if (token !== env.ADMIN_TOKEN) return new Response('Forbidden', { status: 403 });
+
     const { keys } = await env.LINKS.list();
     const items = await Promise.all(
       keys
@@ -91,47 +88,83 @@ export async function onRequest(context) {
           const logs    = rawLogs.slice(0, 3);
 
           return {
-            code, url, clicks,
-            created, creator: metadata.creator||null,
-            expiresIn, logs
+            code,
+            url,
+            clicks,
+            created,
+            creator: metadata.creator || null,
+            expiresIn,
+            logs
           };
         })
     );
     return json(items);
   }
 
-  // 6) GET /api/stats/:slug
+  // 6) GET "/api/stats/:slug" → clicks + full logs
   if (method === 'GET' && /^\/api\/stats\/[a-z0-9]{6}$/i.test(path)) {
     const token = request.headers.get('X-Admin-Token');
-    if (token !== env.ADMIN_TOKEN) {
-      return new Response('Forbidden', { status: 403 });
-    }
+    if (token !== env.ADMIN_TOKEN) return new Response('Forbidden', { status: 403 });
+
     const slug   = path.split('/').pop();
     const clicks = parseInt(await env.STATS.get(slug) || '0', 10);
     const logs   = JSON.parse(await env.LOGS.get('log:' + slug) || '[]');
     return json({ clicks, logs });
   }
 
-  // 7) GET /api/detail/:slug
+  // 7) GET "/api/detail/:slug" → detailed stats
   if (method === 'GET' && /^\/api\/detail\/[a-z0-9]{6}$/i.test(path)) {
     const token = request.headers.get('X-Admin-Token');
-    if (token !== env.ADMIN_TOKEN) {
-      return new Response('Forbidden', { status: 403 });
-    }
-    const slug = path.split('/').pop();
+    if (token !== env.ADMIN_TOKEN) return new Response('Forbidden', { status: 403 });
+
+    const slug        = path.split('/').pop();
     const clicksTotal = parseInt(await env.STATS.get(slug) || '0', 10);
-    // … calcula byDay, byHour, points, etc …
-    // (igual ao código anterior)
+
+    // last 30 days byDay
+    const byDay = {};
+    const now   = Date.now();
+    for (let i = 0; i < 30; i++) {
+      const dayId = new Date(now - i * 864e5)
+        .toISOString().slice(0, 10).replace(/-/g, '');
+      const count = parseInt(await env.STATS_DAY.get(`${dayId}:${slug}`) || '0', 10);
+      if (count) byDay[dayId] = count;
+    }
+
+    // byHour today
     const rawLogs = JSON.parse(await env.LOGS.get('log:' + slug) || '[]');
-    return json({ clicksTotal, byDay, byHour, points, logs: rawLogs.slice(0, 100) });
+    const points  = [];
+    const byHour  = {};
+    const meta    = (await env.LINKS.getWithMetadata(slug)).metadata || {};
+    const created = meta.created || now;
+
+    rawLogs.forEach(l => {
+      if (l.lat != null && l.lon != null) {
+        points.push([l.lat, l.lon]);
+      }
+    });
+
+    if (now - created < 864e5) {
+      rawLogs.forEach(l => {
+        const h = new Date(l.t).getHours().toString().padStart(2, '0');
+        byHour[h] = (byHour[h] || 0) + 1;
+      });
+    }
+
+    // return detail
+    return json({
+      clicksTotal,
+      byDay,
+      byHour,
+      points,
+      logs: rawLogs.slice(0, 100)
+    });
   }
 
-  // 8) DELETE /api/delete/:slug
+  // 8) DELETE "/api/delete/:slug"
   if (method === 'DELETE' && /^\/api\/delete\/[a-z0-9]{6}$/i.test(path)) {
     const token = request.headers.get('X-Admin-Token');
-    if (token !== env.ADMIN_TOKEN) {
-      return new Response('Forbidden', { status: 403 });
-    }
+    if (token !== env.ADMIN_TOKEN) return new Response('Forbidden', { status: 403 });
+
     const slug = path.split('/').pop();
     await Promise.all([
       env.LINKS.delete(slug),
@@ -142,28 +175,28 @@ export async function onRequest(context) {
     return json({ ok: true });
   }
 
-  // 9) Redirect slug — só retorna 302 se não expirado
-  if (method === 'GET' && /^\/[a-z0-9]{6}$/i.test(path)) {
+  // 9) Redirect slug: GET "/XXXXXX"
+  if (method === 'GET' && /^\/[a-z0-9]{6}$/i.test(path.slice(1))) {
     const slug = path.slice(1);
     const { value: dest, metadata = {} } = await env.LINKS.getWithMetadata(slug) || {};
     if (!dest) {
+      // not found or expired
       return new Response('Not found', { status: 404 });
     }
 
-    // checa expiração
-    const now = Date.now()/1000;
-    if (metadata.exp && now > metadata.exp) {
-      // expirou: não apaga do KV, apenas 404
+    // check expiration
+    const nowSec = Date.now()/1000;
+    if (metadata.exp && nowSec > metadata.exp) {
       return new Response('Not found', { status: 404 });
     }
 
-    // grava stats e logs (await)
-    const total = parseInt(await env.STATS.get(slug) || '0', 10) + 1;
-    await env.STATS.put(slug, total.toString());
+    // increment stats & log
+    const newTotal = parseInt(await env.STATS.get(slug) || '0', 10) + 1;
+    await env.STATS.put(slug, newTotal.toString());
 
     const dayKey = new Date().toISOString().slice(0,10).replace(/-/g,'') + ':' + slug;
-    const daily  = parseInt(await env.STATS_DAY.get(dayKey) || '0', 10) + 1;
-    await env.STATS_DAY.put(dayKey, daily.toString());
+    const dayVal = parseInt(await env.STATS_DAY.get(dayKey) || '0', 10) + 1;
+    await env.STATS_DAY.put(dayKey, dayVal.toString());
 
     const ip  = request.headers.get('CF-Connecting-IP');
     const loc = request.cf?.country || '??';
@@ -173,13 +206,13 @@ export async function onRequest(context) {
     if (lat == null || lon == null) {
       const geo = await env.GEO.get(loc);
       if (geo) {
-        try { [lat, lon] = JSON.parse(geo); } catch {}
+        try { [lat, lon] = JSON.parse(geo) } catch {}
       }
     }
 
-    const raw = await env.LOGS.get('log:' + slug) || '[]';
-    const arr = JSON.parse(raw);
-    arr.unshift({ t:Date.now(), ip, loc, lat, lon });
+    const raw   = await env.LOGS.get('log:' + slug) || '[]';
+    const arr   = JSON.parse(raw);
+    arr.unshift({ t: Date.now(), ip, loc, lat, lon });
     arr.length = Math.min(arr.length, 300);
     await env.LOGS.put('log:' + slug, JSON.stringify(arr));
 
@@ -190,10 +223,13 @@ export async function onRequest(context) {
   return new Response('Not found', { status: 404 });
 }
 
-// Helper
+
+// helper to prune daily keys
 async function pruneDaily(ns, slug) {
   const { keys } = await ns.list({ prefix: '', limit: 1000 });
   await Promise.all(
-    keys.filter(k => k.name.endsWith(':' + slug)).map(k => ns.delete(k.name))
+    keys
+      .filter(k => k.name.endsWith(':' + slug))
+      .map(k => ns.delete(k.name))
   );
 }
