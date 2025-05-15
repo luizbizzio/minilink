@@ -82,24 +82,22 @@ async function loadList(){
   renderTable(list);
 }
 
-async function renderTable(list){
-  let rows='';
-  for(const o of list){
-    const stats = await fetch(`${API}/api/stats/${o.code}`,{headers:{'X-Admin-Token':TOKEN}}).then(r=>r.json());
-    rows+=`<tr>
+async function renderTable(list) {
+  let rows = '';
+  for (const o of list) {
+    rows += `<tr>
       <td><a onclick="openDetail('${o.code}')">${o.code}</a></td>
       <td><a href="${o.url}" target="_blank">${o.url||'-'}</a></td>
-      <td>${stats.clicks||0}</td>
+      <td>${o.clicks}</td>
       <td>${o.expiresIn!=null?badge(o.expiresIn):'∞'}</td>
-      <td>${o.created?new Date(o.created).toLocaleString(): '-'}<br>
-          ${o.creator?flag(o.creator.loc)+' '+o.creator.loc+' '+o.creator.ip:''}</td>
-      <td>${logsHtml(stats.logs)}</td>
+      <td>${new Date(o.created).toLocaleString()}<br>
+          ${o.creator?flag(o.creator.loc)+' '+o.creator.ip:''}</td>
+      <td>${logsHtml(o.logs)}</td>
       <td><button class="icon-del" onclick="del('${o.code}')"><i data-feather="trash-2"></i></button></td>
     </tr>`;
   }
-  app.innerHTML=`<h1>All Links</h1><table><thead><tr>
-    <th>Slug</th><th>Destination</th><th>Clicks</th><th>Expires</th><th>Created</th><th>Last hits</th><th></th>
-  </tr></thead><tbody>${rows}</tbody></table>`;
+  app.innerHTML = `<h1>All Links</h1>
+    <table><thead>…</thead><tbody>${rows}</tbody></table>`;
   feather.replace();
 }
 
