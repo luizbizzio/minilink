@@ -159,7 +159,7 @@ export async function onRequest(context) {
     return json({ ok: true });
   }
 
-  // 9) Redirect slug: GET "/XXXXXX"
+  // 9) Redirect slug: GET "/XXXXXX" with GEO fallback and awaited KV writes
   if (method === 'GET' && /^\/[a-z0-9]{6}$/i.test(path)) {
     const slug = path.slice(1);
     const dest = await env.LINKS.get(slug);
@@ -172,16 +172,14 @@ export async function onRequest(context) {
       return new Response('Not found', { status: 404 });
     }
 
-    // update stats
-    env.STATS.put(
-      slug,
-      (parseInt(await env.STATS.get(slug) || '0', 10) + 1).toString()
-    );
+    // increment total clicks
+    const total = parseInt(await env.STATS.get(slug) || '0', 10) + 1;
+    await env.STATS.put(slug, total.toString());
+
+    // increment daily clicks
     const dayKey = new Date().toISOString().slice(0,10).replace(/-/g, '') + ':' + slug;
-    env.STATS_DAY.put(
-      dayKey,
-      (parseInt(await env.STATS_DAY.get(dayKey) || '0', 10) + 1).toString()
-    );
+    const daily  = parseInt(await env.STATS_DAY.get(dayKey) || '0', 10) + 1;
+    await env.STATS_DAY.put(dayKey, daily.toString());
 
     // capture IP and country
     const ip  = request.headers.get('CF-Connecting-IP');
@@ -193,9 +191,7 @@ export async function onRequest(context) {
     if (lat == null || lon == null) {
       const geo = await env.GEO.get(loc);
       if (geo) {
-        try {
-          [lat, lon] = JSON.parse(geo);
-        } catch {}
+        try { [lat, lon] = JSON.parse(geo); } catch {}
       }
     }
 
@@ -204,17 +200,17 @@ export async function onRequest(context) {
     const arr = JSON.parse(raw);
     arr.unshift({ t: Date.now(), ip, loc, lat, lon });
     arr.length = Math.min(arr.length, 300);
-    env.LOGS.put('log:' + slug, JSON.stringify(arr));
+    await env.LOGS.put('log:' + slug, JSON.stringify(arr));
 
-    // perform the redirect
+    // finally redirect
     return Response.redirect(dest, 302);
   }
 
-  // Fallback 404
+  // fallback 404
   return new Response('Not found', { status: 404 });
 }
 
-// Helper to prune daily keys
+// Helper to prune daily stats keys
 async function pruneDaily(ns, slug) {
   const { keys } = await ns.list({ prefix: '', limit: 1000 });
   await Promise.all(
