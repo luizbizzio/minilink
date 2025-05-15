@@ -67,7 +67,7 @@ export async function onRequest(context) {
     }
   }
 
-  // 5) Admin API: GET "/api/list" — includes last 3 hits
+  // 5) Admin API: GET "/api/list" — includes total clicks + last 3 hits
   if (method === 'GET' && path === '/api/list') {
     const token = request.headers.get('X-Admin-Token');
     if (token !== env.ADMIN_TOKEN) {
@@ -82,13 +82,16 @@ export async function onRequest(context) {
           const url  = await env.LINKS.get(code);
           const meta = (await env.LINKS.getWithMetadata(code)).metadata || {};
 
-          // fetch the recent hits:
+          // total clicks
+          const clicks = parseInt(await env.STATS.get(code) || '0', 10);
+          // last 3 logs
           const rawLogs = JSON.parse(await env.LOGS.get('log:' + code) || '[]');
           const logs    = rawLogs.slice(0, 3);
 
           return {
             code,
             url,
+            clicks,
             created:   meta.created   || 0,
             creator:   meta.creator   || null,
             expiresIn: meta.exp ? meta.exp - Date.now() / 1000 : null,
@@ -130,8 +133,7 @@ export async function onRequest(context) {
     const rawLogs = JSON.parse(await env.LOGS.get('log:' + slug) || '[]');
     const points  = rawLogs.filter(l => l.lat != null).map(l => [l.lat, l.lon]);
     const byHour  = {};
-    const created = (await env.LINKS.getWithMetadata(slug))
-                      .metadata?.created || now;
+    const created = (await env.LINKS.getWithMetadata(slug)).metadata?.created || now;
     if (now - created < 864e5) {
       rawLogs.forEach(l => {
         const h = new Date(l.t).getHours().toString().padStart(2, '0');
@@ -157,8 +159,8 @@ export async function onRequest(context) {
     return json({ ok: true });
   }
 
-  // 9) Redirect slug: GET "/XXXXXX" with GEO fallback
-  if (method === 'GET' && /^\/[a-z0-9]{6}$/i.test(path)) {
+  // 9) Redirect slug: GET "/XXXXXX"
+  if (method === 'GET' && /^\/[a-z0-9]{6}$/i.test(path.slice(1))) {
     const slug = path.slice(1);
     const dest = await env.LINKS.get(slug);
     if (!dest) {
@@ -170,12 +172,12 @@ export async function onRequest(context) {
       return new Response('Not found', { status: 404 });
     }
 
-    // update stats (fire-and-forget)
+    // update stats
     env.STATS.put(
       slug,
       (parseInt(await env.STATS.get(slug) || '0', 10) + 1).toString()
     );
-    const dayKey = new Date().toISOString().slice(0,10).replace(/-/g,'') + ':' + slug;
+    const dayKey = new Date().toISOString().slice(0,10).replace(/-/g, '') + ':' + slug;
     env.STATS_DAY.put(
       dayKey,
       (parseInt(await env.STATS_DAY.get(dayKey) || '0', 10) + 1).toString()
