@@ -1,7 +1,0 @@
-name        = "url-shortener-pages"
-type        = "javascript"
-
-[build]
-command    = ""
-publish    = "public"
-functions  = "functions"
