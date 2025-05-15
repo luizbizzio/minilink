@@ -96,8 +96,25 @@ async function renderTable(list) {
       <td><button class="icon-del" onclick="del('${o.code}')"><i data-feather="trash-2"></i></button></td>
     </tr>`;
   }
-  app.innerHTML = `<h1>All Links</h1>
-    <table><thead>…</thead><tbody>${rows}</tbody></table>`;
+
+  app.innerHTML = `
+    <h1>All Links</h1>
+    <table>
+      <thead>
+        <tr>
+          <th>Slug</th>
+          <th>Destination</th>
+          <th>Clicks</th>
+          <th>Expires</th>
+          <th>Created</th>
+          <th>Last hits</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+      </tbody>
+    </table>`;
   feather.replace();
 }
 
