@@ -152,6 +152,19 @@ async function openDetail(slug){
 }
 
 function closeModal(){overlay.style.display='none';}
-async function del(code){if(confirm('Delete '+code+' ?')){await fetch(`${API}/api/delete/${code}`,{method:'DELETE',headers:{'X-Admin-Token':TOKEN}});loadList();}}
+async function del(code) {
+  if (!confirm(`Delete ${code} ?`)) return;
+
+  const res = await fetch(`/api/delete/${code}`, {
+    method : 'DELETE',
+    headers: { 'X-Admin-Token': TOKEN }
+  });
+
+  if (!res.ok) {
+    alert(`Falha ao apagar: ${await res.text()}`);
+    return;
+  }
+  await loadList();
+}
 </script>
 </body></html>
