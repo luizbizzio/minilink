@@ -6,7 +6,8 @@ export async function onRequest(context) {
   const path   = url.pathname;
   const method = request.method;
 
-  // CORS headers
+  /* ---------- util ---------- */
+
   const cors = {
     'Access-Control-Allow-Origin':  '*',
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
@@ -18,23 +19,25 @@ export async function onRequest(context) {
       headers: { 'Content-Type': 'application/json', ...cors }
     });
 
-  // 1) Preflight CORS
+  /* ---------- CORS pre-flight ---------- */
+
   if (method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: cors });
   }
 
-  // 2) Redirect "/admin" → "/admin/"
+  /* ---------- static/admin routes ---------- */
+
   if (path === '/admin') {
     url.pathname = '/admin/';
     return Response.redirect(url.toString(), 308);
   }
 
-  // 3) Serve static for "/" and "/admin/*"
   if (path === '/' || path.startsWith('/admin/')) {
     return await next();
   }
 
-  // 4) Create new short link: POST "/"
+  /* ---------- create short link ---------- */
+
   if (method === 'POST' && path === '/') {
     try {
       const { code, url: longUrl, ttl } = await request.json();
@@ -42,56 +45,58 @@ export async function onRequest(context) {
         return json({ error: 'bad payload' }, 400);
       }
 
-      // Compute expiration metadata, but do NOT clear stats/logs here
       const ttlSec = Math.min(Math.max(ttl || 0, 900), 2_592_000);
       const exp    = Date.now() / 1000 + ttlSec;
       const meta   = {
         created: Date.now(),
         exp,
         creator: {
-          ip:  request.headers.get('CF-Connecting-IP'),
+          ip : request.headers.get('CF-Connecting-IP'),
           loc: request.cf?.country || '??'
         }
       };
 
-      // Store without expirationTtl so that we keep stats/logs
       await env.LINKS.put(code, longUrl, { metadata: meta });
       return json({ ok: true, code });
 
-    } catch (e) {
+    } catch {
       return json({ error: 'invalid json' }, 400);
     }
   }
 
-  // 5) Admin API: GET "/api/list"
+  /* ---------- admin: list all ---------- */
+
   if (method === 'GET' && path === '/api/list') {
     const token = request.headers.get('X-Admin-Token');
-    if (token !== env.ADMIN_TOKEN) {
-      return new Response('Forbidden', { status: 403 });
-    }
+    if (token !== env.ADMIN_TOKEN) return new Response('Forbidden', { status: 403 });
+
     const { keys } = await env.LINKS.list();
     const items = await Promise.all(
       keys
         .filter(k => /^[a-z0-9]{6}$/i.test(k.name))
         .map(async k => {
-          const code = k.name;
-          const url  = await env.LINKS.get(code);
-          const { metadata = {} } = await env.LINKS.getWithMetadata(code) || {};
-          const created   = metadata.created || 0;
-          const exp       = metadata.exp || 0;
-          const expiresIn = Math.floor(exp - Date.now()/1000);
+          const code  = k.name;
+          const url   = await env.LINKS.get(code);
+
+          /*  --- fix: metadata pode ser null --- */
+          const obj  = await env.LINKS.getWithMetadata(code);
+          const meta = obj?.metadata ?? {};
+
+          const created   = meta.created ?? 0;
+          const exp       = meta.exp ?? 0;
+          const expiresIn = Math.floor(exp - Date.now() / 1000);
           const expired   = expiresIn <= 0;
 
-          const clicks = parseInt(await env.STATS.get(code) || '0', 10);
-          const rawLogs = JSON.parse(await env.LOGS.get('log:' + code) || '[]');
-          const logs    = rawLogs.slice(0, 3);
+          const clicks   = parseInt(await env.STATS.get(code) || '0', 10);
+          const rawLogs  = JSON.parse(await env.LOGS.get('log:' + code) || '[]');
+          const logs     = rawLogs.slice(0, 3);
 
           return {
             code,
             url,
             clicks,
             created,
-            creator:   metadata.creator || null,
+            creator   : meta.creator ?? null,
             expiresIn,
             expired,
             logs
@@ -101,47 +106,49 @@ export async function onRequest(context) {
     return json(items);
   }
 
-  // 6) Admin API: GET "/api/stats/:slug"
+  /* ---------- admin: stats summary ---------- */
+
   if (method === 'GET' && /^\/api\/stats\/[a-z0-9]{6}$/i.test(path)) {
     const token = request.headers.get('X-Admin-Token');
-    if (token !== env.ADMIN_TOKEN) {
-      return new Response('Forbidden', { status: 403 });
-    }
+    if (token !== env.ADMIN_TOKEN) return new Response('Forbidden', { status: 403 });
+
     const slug   = path.split('/').pop();
     const clicks = parseInt(await env.STATS.get(slug) || '0', 10);
     const logs   = JSON.parse(await env.LOGS.get('log:' + slug) || '[]');
     return json({ clicks, logs });
   }
 
-  // 7) Admin API: GET "/api/detail/:slug"
+  /* ---------- admin: detail ---------- */
+
   if (method === 'GET' && /^\/api\/detail\/[a-z0-9]{6}$/i.test(path)) {
     const token = request.headers.get('X-Admin-Token');
-    if (token !== env.ADMIN_TOKEN) {
-      return new Response('Forbidden', { status: 403 });
-    }
+    if (token !== env.ADMIN_TOKEN) return new Response('Forbidden', { status: 403 });
+
     const slug        = path.split('/').pop();
     const clicksTotal = parseInt(await env.STATS.get(slug) || '0', 10);
 
-    // last 30 days byDay
+    /* ---- daily stats (últimos 30 dias) ---- */
     const byDay = {};
     const now   = Date.now();
     for (let i = 0; i < 30; i++) {
       const dayId = new Date(now - i * 864e5)
-        .toISOString().slice(0, 10).replace(/-/g, '');
+        .toISOString()
+        .slice(0, 10)
+        .replace(/-/g, '');
       const count = parseInt(await env.STATS_DAY.get(`${dayId}:${slug}`) || '0', 10);
       if (count) byDay[dayId] = count;
     }
 
-    // raw logs
+    /* ---- logs + heatmap ---- */
     const rawLogs = JSON.parse(await env.LOGS.get('log:' + slug) || '[]');
-    // heatmap points
-    const points = rawLogs
+    const points  = rawLogs
       .filter(l => l.lat != null && l.lon != null)
       .map(l => [l.lat, l.lon]);
 
-    // byHour if created today
+    /* ---- byHour se criado hoje ---- */
+    const linkObj = await env.LINKS.getWithMetadata(slug);
+    const created = linkObj?.metadata?.created ?? now;
     const byHour  = {};
-    const created = (await env.LINKS.getWithMetadata(slug)).metadata?.created || now;
     if (now - created < 864e5) {
       rawLogs.forEach(l => {
         const h = new Date(l.t).getHours().toString().padStart(2, '0');
@@ -158,12 +165,12 @@ export async function onRequest(context) {
     });
   }
 
-  // 8) Admin API: DELETE "/api/delete/:slug"
+  /* ---------- admin: delete ---------- */
+
   if (method === 'DELETE' && /^\/api\/delete\/[a-z0-9]{6}$/i.test(path)) {
     const token = request.headers.get('X-Admin-Token');
-    if (token !== env.ADMIN_TOKEN) {
-      return new Response('Forbidden', { status: 403 });
-    }
+    if (token !== env.ADMIN_TOKEN) return new Response('Forbidden', { status: 403 });
+
     const slug = path.split('/').pop();
     await Promise.all([
       env.LINKS.delete(slug),
@@ -174,39 +181,41 @@ export async function onRequest(context) {
     return json({ ok: true });
   }
 
-  // 9) Redirect slug: GET "/XXXXXX"
+  /* ---------- redirect slug ---------- */
+
   if (method === 'GET' && /^\/[a-z0-9]{6}$/i.test(path)) {
-    const slug = path.slice(1);
-    const { value: dest, metadata = {} } = await env.LINKS.getWithMetadata(slug) || {};
-    if (!dest) {
-      return new Response('Not found', { status: 404 });
-    }
+    const slug    = path.slice(1);
+
+    /* ---- fix: obj pode ser undefined ---- */
+    const linkObj = await env.LINKS.getWithMetadata(slug) || {};
+    const dest    = linkObj.value;
+    const metadata = linkObj.metadata ?? {};
+
+    if (!dest) return new Response('Not found', { status: 404 });
+
     const nowSec = Date.now() / 1000;
     if (metadata.exp && nowSec > metadata.exp) {
-      // expired: do not delete, just signal
       return new Response('Link expired', { status: 410 });
     }
 
-    // increment total clicks
     const total = parseInt(await env.STATS.get(slug) || '0', 10) + 1;
     await env.STATS.put(slug, total.toString());
 
-    // increment daily clicks
-    const dayKey = new Date().toISOString().slice(0,10).replace(/-/g,'') + ':' + slug;
+    const dayKey = new Date().toISOString().slice(0, 10).replace(/-/g, '') + ':' + slug;
     const daily  = parseInt(await env.STATS_DAY.get(dayKey) || '0', 10) + 1;
     await env.STATS_DAY.put(dayKey, daily.toString());
 
-    // log with geo fallback
     const ip  = request.headers.get('CF-Connecting-IP');
     const loc = request.cf?.country || '??';
-    let lat = request.cf?.latitude ?? null;
-    let lon = request.cf?.longitude ?? null;
+    let lat   = request.cf?.latitude ?? null;
+    let lon   = request.cf?.longitude ?? null;
     if (lat == null || lon == null) {
       const geo = await env.GEO.get(loc);
       if (geo) {
         try { [lat, lon] = JSON.parse(geo); } catch {}
       }
     }
+
     const raw = await env.LOGS.get('log:' + slug) || '[]';
     const arr = JSON.parse(raw);
     arr.unshift({ t: Date.now(), ip, loc, lat, lon });
@@ -216,11 +225,13 @@ export async function onRequest(context) {
     return Response.redirect(dest, 302);
   }
 
-  // fallback 404
+  /* ---------- fallback 404 ---------- */
+
   return new Response('Not found', { status: 404 });
 }
 
-// Helper to prune daily keys
+/* ---------- helper ---------- */
+
 async function pruneDaily(ns, slug) {
   const { keys } = await ns.list({ prefix: '', limit: 1000 });
   await Promise.all(
