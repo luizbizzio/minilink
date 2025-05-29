@@ -75,8 +75,7 @@ export async function onRequest (context) {
 
             const meta       = obj.metadata ?? {};
             const exp        = meta.exp ?? 0;
-            const expiresIn  = exp === 0 ? null
-                               : Math.floor(exp - Date.now() / 1000);
+            const expiresIn = Math.floor(exp - Date.now()/1000); // 0 = infinito
 
             return {
               code,
