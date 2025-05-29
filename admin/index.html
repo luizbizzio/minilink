@@ -72,10 +72,12 @@ const flag  = cc => cc && cc.length===2
   : '';
 
 const badge = s => {
-  if (s === null) return '∞';                    // ilimitado
+  if (s === 0)   return '∞';                           // 0  → infinito
   if (s === -1)  return '<span class="badge red">deleted</span>';
-  if (s <= 0)     return '<span class="badge red">expired</span>';
-  const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);
+  if (s <= 0)    return '<span class="badge red">expired</span>';
+  const d = Math.floor(s/86400),
+        h = Math.floor(s%86400/3600),
+        m = Math.floor(s%3600/60);
   return `<span class="badge green">${d?d+'d ':''}${h?h+'h ':''}${m?m+'m':''}</span>`;
 };
 
