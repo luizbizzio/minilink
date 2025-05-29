@@ -29,14 +29,15 @@ export async function onRequest (context) {
   if (path === '/' || path.startsWith('/admin/'))
     return await next();
 
-  /* ─────────────── POST /  (criar link) ─────────────────────────────── */
+  /* ───────────── POST /  (criar link) ───────────── */
   if (method === 'POST' && path === '/') {
     try {
-      const { code, url: longUrl, ttl = 0 } = await request.json();
+      let { code, url: longUrl, ttl = 0 } = await request.json();
+      ttl = Number(ttl);                              // <- converte string "0"
+
       if (!code || !/^https?:\/\//i.test(longUrl))
         return json({ error: 'bad payload' }, 400);
 
-      console.log('TTL recebido', ttl);           // debug opcional
       const ttlSec = ttl === 0 ? 0
                    : Math.min(Math.max(ttl, 900), 2_592_000);
       const exp    = ttlSec === 0 ? 0
