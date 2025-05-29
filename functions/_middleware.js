@@ -11,9 +11,9 @@ export async function onRequest(context) {
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Token'
   };
-  const json = (data, status = 200) =>
-    new Response(JSON.stringify(data), {
-      status,
+  const json = (d, s = 200) =>
+    new Response(JSON.stringify(d), {
+      status: s,
       headers: { 'Content-Type': 'application/json', ...cors }
     });
 
@@ -21,7 +21,7 @@ export async function onRequest(context) {
   if (method === 'OPTIONS')
     return new Response(null, { status: 204, headers: cors });
 
-  /* static + admin html ------------------------------------------------- */
+  /* static  ------------------------------------------------------------- */
   if (path === '/admin') {
     url.pathname = '/admin/';
     return Response.redirect(url.toString(), 308);
@@ -36,6 +36,7 @@ export async function onRequest(context) {
       if (!code || !/^https?:\/\//i.test(longUrl))
         return json({ error: 'bad payload' }, 400);
 
+      console.log('TTL recebido', ttl);                 // debug opcional
       const ttlSec = ttl === 0 ? 0
                    : Math.min(Math.max(ttl, 900), 2_592_000);
       const exp    = ttlSec === 0 ? 0
@@ -68,15 +69,14 @@ export async function onRequest(context) {
           .map(async k => {
             const code = k.name;
             const obj  = await env.LINKS.getWithMetadata(code);
-            if (!obj || obj.value == null) return null;    // apagado à força
+            if (!obj || obj.value == null) return null;    // removido à força
 
             const meta       = obj.metadata ?? {};
             const created    = meta.created ?? 0;
             const exp        = meta.exp ?? 0;
             const expiresIn  = exp === 0 ? null
-                               : Math.floor(exp - Date.now()/1000);
-            const expired    = expiresIn !== null && expiresIn <= 0;
-            const disabled   = !!meta.deleted;
+                               : Math.floor(exp - Date.now() / 1000);
+            const expired    = meta.deleted || (expiresIn !== null && expiresIn <= 0);
 
             return {
               code,
@@ -84,16 +84,15 @@ export async function onRequest(context) {
               clicks    : parseInt(await env.STATS.get(code) || '0', 10),
               created,
               creator   : meta.creator ?? null,
-              expiresIn : disabled ? -1 : expiresIn, // -1 sinaliza delete
-              expired   : disabled || expired,
-              logs      : []                         // logs só em /detail
+              expiresIn : meta.deleted ? -1 : expiresIn,   // -1 = deleted
+              expired,
+              logs      : (JSON.parse(await env.LOGS.get('log:' + code) || '[]'))
+                            .slice(0, 3)
             };
           })
     )).filter(Boolean);
 
-    /* ordem mais novos primeiro */
-    items.sort((a, b) => b.created - a.created);
-
+    items.sort((a, b) => b.created - a.created);          // mais novos primeiro
     return json(items);
   }
 
@@ -113,9 +112,8 @@ export async function onRequest(context) {
 
     const byDay = {};
     for (let i = 0; i < 30; i++) {
-      const dayId = new Date(now - i * 864e5)
-        .toISOString().slice(0,10).replace(/-/g,'');
-      const cnt = parseInt(await env.STATS_DAY.get(`${dayId}:${slug}`) || '0', 10);
+      const dayId = new Date(now - i * 864e5).toISOString().slice(0,10).replace(/-/g,'');
+      const cnt   = parseInt(await env.STATS_DAY.get(`${dayId}:${slug}`) || '0', 10);
       if (cnt) byDay[dayId] = cnt;
     }
 
@@ -136,7 +134,7 @@ export async function onRequest(context) {
     });
   }
 
-  /* delete (DESABILITAR) ----------------------------------------------- */
+  /* delete  → só desabilita -------------------------------------------- */
   if (method === 'DELETE' && /^\/api\/delete\/[a-z0-9]{6}$/i.test(path)) {
     if (request.headers.get('X-Admin-Token') !== env.ADMIN_TOKEN)
       return new Response('Forbidden', { status: 403 });
@@ -146,14 +144,14 @@ export async function onRequest(context) {
     if (!obj) return json({ error: 'not found' }, 404);
 
     const meta = { ...(obj.metadata ?? {}), exp: 1, deleted: true };
-    await env.LINKS.put(slug, obj.value, { metadata: meta });  // mantém URL
+    await env.LINKS.put(slug, obj.value, { metadata: meta });  // mantém valor
     return json({ ok: true });
   }
 
   /* redirect ------------------------------------------------------------ */
   if (method === 'GET' && /^\/[a-z0-9]{6}$/i.test(path)) {
-    const slug    = path.slice(1);
-    const obj     = await env.LINKS.getWithMetadata(slug);
+    const slug = path.slice(1);
+    const obj  = await env.LINKS.getWithMetadata(slug);
     if (!obj || obj.value == null)
       return new Response('Not found', { status: 404 });
 
@@ -162,14 +160,15 @@ export async function onRequest(context) {
     if (meta.deleted || (meta.exp && meta.exp < nowSec))
       return new Response('Link expired', { status: 410 });
 
-    /* stats + logs (mesmo código) -------------------------------------- */
+    /* stats ------------------------------------------------------------- */
     await env.STATS.put(slug,
-      (parseInt(await env.STATS.get(slug) || '0',10) + 1).toString());
+      (parseInt(await env.STATS.get(slug) || '0', 10) + 1).toString());
 
-    const dayKey = new Date().toISOString().slice(0,10).replace(/-/g,'')+':'+slug;
+    const dayKey = new Date().toISOString().slice(0,10).replace(/-/g,'') + ':' + slug;
     await env.STATS_DAY.put(dayKey,
-      (parseInt(await env.STATS_DAY.get(dayKey) || '0',10) + 1).toString());
+      (parseInt(await env.STATS_DAY.get(dayKey) || '0', 10) + 1).toString());
 
+    /* logs -------------------------------------------------------------- */
     const ip  = request.headers.get('CF-Connecting-IP');
     const loc = request.cf?.country || '??';
     let lat   = request.cf?.latitude ?? null;
@@ -192,7 +191,7 @@ export async function onRequest(context) {
   return new Response('Not found', { status: 404 });
 }
 
-/* helper: remove stats diários de slug “morto” --------------------------- */
+/* helper: limpa stats diários (não usado agora, mas mantém) ------------- */
 async function pruneDaily(ns, slug) {
   const { keys } = await ns.list({ limit: 1000 });
   await Promise.all(
